@@ -1,0 +1,20 @@
+{
+  "knobs": 1,
+  "about": "Fewer things asking for attention: no recent apps, clean desktop, no surprise pop-ups when you plug things in.",
+  "about.zh": "让打扰少一点:程序坞不显示最近使用、桌面干净、插设备不再乱弹窗。",
+  "settings": {
+    "dock.autohide": true,
+    "dock.recents": false,
+    "dock.indicators": true,
+    "desktop.icons": false,
+    "desktop.widgets": false,
+    "desktop.clickToReveal": false,
+    "menubar.autohide": false,
+    "corners.bottomRight": "1",
+    "sound.uiEffects": false,
+    "apps.photosOnConnect": false,
+    "apps.timeMachineNewDisks": false,
+    "screenshots.thumbnail": false,
+    "spaces.autoRearrange": false
+  }
+}

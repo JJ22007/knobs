@@ -1,0 +1,47 @@
+{
+  "knobs": 1,
+  "about": "The author's own Mac: instant Spaces, snappy windows, a tidy Dock and Finder, plus the Paneful window tiling shortcuts.",
+  "about.zh": "作者自己的 Mac:无动画切换桌面、窗口利落、程序坞和访达整洁,外加 Paneful 分屏快捷键。",
+  "settings": {
+    "desktop.clickToReveal": false,
+    "desktop.widgets": true,
+    "dock.autohide": false,
+    "dock.minimizeToApp": true,
+    "dock.recents": false,
+    "dock.size": 43,
+    "finder.disksOnDesktop": true,
+    "finder.extensions": true,
+    "finder.externalDisksOnDesktop": true,
+    "finder.foldersFirst": true,
+    "finder.pathBar": true,
+    "finder.removableOnDesktop": true,
+    "finder.serversOnDesktop": true,
+    "finder.statusBar": true,
+    "finder.view": "clmv",
+    "menubar.clockDate": "0",
+    "menubar.clockSeconds": true,
+    "menubar.clockWeekday": true,
+    "spaces.groupByApp": true,
+    "spaces.instant": true,
+    "text.capitalize": true,
+    "text.doubleSpacePeriod": true,
+    "trackpad.clickPressure": "0",
+    "trackpad.forceClick": true,
+    "trackpad.inertia": true,
+    "trackpad.lookUp": false,
+    "trackpad.rightClick": true,
+    "trackpad.speed": 2.5,
+    "trackpad.tapToClick": true,
+    "trackpad.threeFingerDrag": true,
+    "ui.scrollBars": "WhenScrolling",
+    "windows.tabs": "always",
+    "windows.tileMargins": false
+  },
+  "shortcuts": {
+    "spaceLeft": "ctrl+left",
+    "spaceRight": "ctrl+right"
+  },
+  "files": {
+    "~/.config/paneful/config.json": "{\n  \"custom\" : [\n\n  ],\n  \"dragSnap\" : false,\n  \"gap\" : 0,\n  \"shortcuts\" : {\n    \"almostMaximize\" : \"ctrl+alt+m\",\n    \"bottomHalf\" : \"ctrl+alt+down\",\n    \"bottomLeft\" : \"ctrl+alt+j\",\n    \"bottomRight\" : \"ctrl+alt+k\",\n    \"center\" : \"ctrl+alt+c\",\n    \"centerThird\" : \"ctrl+alt+f\",\n    \"firstThird\" : \"ctrl+alt+d\",\n    \"firstTwoThirds\" : \"ctrl+alt+e\",\n    \"lastThird\" : \"ctrl+alt+g\",\n    \"lastTwoThirds\" : \"ctrl+alt+t\",\n    \"leftHalf\" : \"ctrl+alt+left\",\n    \"maximize\" : \"ctrl+alt+return\",\n    \"nextDisplay\" : \"ctrl+alt+cmd+right\",\n    \"prevDisplay\" : \"ctrl+alt+cmd+left\",\n    \"restore\" : \"ctrl+alt+delete\",\n    \"rightHalf\" : \"ctrl+alt+right\",\n    \"tileAll\" : \"ctrl+alt+a\",\n    \"topHalf\" : \"ctrl+alt+up\",\n    \"topLeft\" : \"ctrl+alt+u\",\n    \"topRight\" : \"ctrl+alt+i\"\n  },\n  \"tile\" : {\n    \"max\" : 6,\n    \"rows\" : {\n\n    }\n  }\n}"
+  }
+}

@@ -14,7 +14,7 @@ The command is `~/.local/bin/knobs` (a link into `~/Applications/Knobs.app`). If
 
 Output follows the system language. Set `KNOBS_LANG=en` (or `zh`) for a fixed language. Values are always written in English (`on`, `off`, numbers, option names). A Chinese version of this file is `AGENTS.zh-CN.md`.
 
-Setting up a Mac from a profile: `knobs apply <file> --dry-run`, show the user the list, then `knobs apply <file>`.
+Setting up a Mac from a profile: `knobs apply <file|https-url|preset> --dry-run`, show the user the list, then apply without `--dry-run`. `knobs presets` lists the bundled presets; new ones go in `presets/` and are validated by `build.sh`.
 
 The only thing you cannot do for the user is grant the Accessibility permission, which instant Space switching needs. If `knobs set spaces.instant on` says it is waiting for the permission, ask the user to switch Knobs on in System Settings → Privacy & Security → Accessibility. Knobs notices within a second; confirm with `knobs status`. Never try to grant it yourself, and never use `sudo` for anything in this project.
 
@@ -26,7 +26,7 @@ The only thing you cannot do for the user is grant the Accessibility permission,
 - UI text goes through `L("English", "中文")`.
 
 ```bash
-bash build.sh            # compile, run the self-test, validate examples/
+bash build.sh            # compile, run the self-test, validate presets/
 bash build.sh install    # also install to ~/Applications, link ~/.local/bin/knobs, launch
 ```
 

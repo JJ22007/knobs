@@ -1,6 +1,7 @@
 {
   "knobs": 1,
-  "about": "A starter profile: no waiting on animations, a quiet Dock, a Finder that shows what is there. Preview with `knobs apply examples/snappy.knobs.json --dry-run`.",
+  "about": "No waiting on animations, a quiet Dock, a Finder that shows what is there.",
+  "about.zh": "不等动画、安静的程序坞、什么都看得见的访达。",
   "settings": {
     "spaces.instant": true,
     "spaces.autoRearrange": false,
@@ -28,5 +29,8 @@
     "text.smartDashes": false,
     "screenshots.thumbnail": false
   },
-  "shortcuts": { "spaceLeft": "ctrl+left", "spaceRight": "ctrl+right" }
+  "shortcuts": {
+    "spaceLeft": "ctrl+left",
+    "spaceRight": "ctrl+right"
+  }
 }

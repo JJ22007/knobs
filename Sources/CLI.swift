@@ -8,7 +8,7 @@
 import AppKit
 
 enum CLI {
-    static let commands: Set<String> = ["list", "get", "describe", "set", "reset", "export", "apply", "shortcut", "status", "open", "skill", "help", "--help", "-h"]
+    static let commands: Set<String> = ["list", "get", "describe", "set", "reset", "export", "apply", "shortcut", "status", "open", "skill", "presets", "help", "--help", "-h"]
 
     private static let usageEN = """
     knobs: read and change macOS settings from scripts and agents.
@@ -20,7 +20,9 @@ enum CLI {
       knobs reset <id> [<id> ...]                  hand settings back to the macOS default
       knobs shortcut [<name> <combo|none>]         show or change the Space shortcuts (e.g. spaceLeft ctrl+left)
       knobs export [file]                          write all settings and shortcuts as one profile
-      knobs apply <file> [--dry-run]               apply a profile; --dry-run only lists the changes
+      knobs apply <file|https-url|preset> [--dry-run]
+                                                   apply a profile; --dry-run only lists the changes
+      knobs presets                                ready-made profiles you can apply by name
       knobs status                                 is the app running, and are the live features active
       knobs open                                   open the Knobs window
       knobs skill [install|remove]                 teach Claude Code about knobs in every folder (a user-level skill)
@@ -39,7 +41,9 @@ enum CLI {
       knobs reset <id> [<id> ...]                  恢复为 macOS 默认
       knobs shortcut [<名称> <组合键|none>]        查看或修改切换桌面的快捷键(例如 spaceLeft ctrl+left)
       knobs export [文件]                          把所有设置和快捷键导出成一个配置文件
-      knobs apply <文件> [--dry-run]               应用配置文件;--dry-run 只列出会改什么
+      knobs apply <文件|https 链接|预设名> [--dry-run]
+                                                   应用配置文件;--dry-run 只列出会改什么
+      knobs presets                                列出可以直接按名字应用的现成配置
       knobs status                                 应用是否在运行,实时功能是否生效
       knobs open                                   打开 Knobs 窗口
       knobs skill [install|remove]                 让 Claude Code 在任何文件夹都认识 knobs(用户级 skill)
@@ -70,6 +74,7 @@ enum CLI {
         case "status": return status()
         case "open": return launchApp(background: false) ? 0 : 1
         case "skill": return skill(rest.first ?? "print")
+        case "presets": return presets()
         default: print(usage); return 0
         }
     }
@@ -284,7 +289,12 @@ enum CLI {
     }
 
     private static func apply(dryRun: Bool, path: String?) -> Int32 {
-        guard let path, let text = try? String(contentsOfFile: expandTilde(path), encoding: .utf8) else { return fail(L("usage: knobs apply <file> [--dry-run]", "用法:knobs apply <文件> [--dry-run]")) }
+        guard let path else { return fail(L("usage: knobs apply <file|https-url|preset> [--dry-run]", "用法:knobs apply <文件|https 链接|预设名> [--dry-run]")) }
+        let text: String
+        switch loadProfile(path) {
+        case .success(let t): text = t
+        case .failure(let e): return fail(e.description)
+        }
         do {
             let report = try Profile.apply(text: text, dryRun: dryRun)
             report.changed.forEach { print(L("\(dryRun ? "would change" : "changed") \($0)", "\(dryRun ? "将会更改" : "已更改") \($0)")) }
@@ -294,6 +304,57 @@ enum CLI {
             let liveIDs = dryRun ? [] : catalog.filter { if case .live = $0.backing { return Engine.current($0) == .bool(true) }; return false }.map { $0.id }
             return max(report.problems.isEmpty ? 0 : 1, reportLive(liveIDs))
         } catch { return fail("\(error)") }
+    }
+
+    // MARK: Profiles from anywhere
+
+    /// Profiles bundled with the app, by name (Contents/Resources/presets/<name>.knobs.json).
+    static var presetDirectory: URL? {
+        // Resolve the ~/.local/bin/knobs link first: Bundle.main would otherwise point at ~/.local/bin.
+        let exe = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+        return exe.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/presets")
+    }
+
+    static func presetNames() -> [String] {
+        guard let dir = presetDirectory, let files = try? FileManager.default.contentsOfDirectory(atPath: dir.path) else { return [] }
+        return files.filter { $0.hasSuffix(".knobs.json") }.map { String($0.dropLast(".knobs.json".count)) }.sorted()
+    }
+
+    /// A file path, an https link (a gist, a raw GitHub file) or the name of a bundled preset.
+    static func loadProfile(_ source: String) -> Result<String, KnobsError> {
+        if source.hasPrefix("http://") { return .failure(KnobsError(L("use an https:// link", "请使用 https:// 链接"))) }
+        if source.hasPrefix("https://"), let url = URL(string: source) {
+            var result: Result<String, KnobsError> = .failure(KnobsError(L("could not download \(source)", "无法下载 \(source)")))
+            let done = DispatchSemaphore(value: 0)
+            var request = URLRequest(url: url, timeoutInterval: 20)
+            request.setValue("knobs", forHTTPHeaderField: "User-Agent")
+            URLSession.shared.dataTask(with: request) { data, response, _ in
+                if let data, (response as? HTTPURLResponse)?.statusCode == 200, data.count < 1_000_000,
+                   let text = String(data: data, encoding: .utf8) { result = .success(text) }
+                done.signal()
+            }.resume()
+            done.wait()
+            return result
+        }
+        let path = expandTilde(source)
+        if FileManager.default.fileExists(atPath: path), let text = try? String(contentsOfFile: path, encoding: .utf8) { return .success(text) }
+        if let dir = presetDirectory, let text = try? String(contentsOf: dir.appendingPathComponent("\(source).knobs.json"), encoding: .utf8) {
+            return .success(text)
+        }
+        return .failure(KnobsError(L("no file, link or preset called \"\(source)\". Presets: \(presetNames().joined(separator: ", "))",
+                                     "找不到名为“\(source)”的文件、链接或预设。可用预设:\(presetNames().joined(separator: ", "))")))
+    }
+
+    private static func presets() -> Int32 {
+        for name in presetNames() {
+            guard case .success(let text) = loadProfile(name),
+                  let obj = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any] else { continue }
+            let count = (obj["settings"] as? [String: Any])?.count ?? 0
+            let about = (obj[prefersChinese ? "about.zh" : "about"] as? String) ?? (obj["about"] as? String) ?? ""
+            print("\(name.padding(toLength: 12, withPad: " ", startingAt: 0)) \(L("\(count) settings", "\(count) 项"))  \(about)")
+        }
+        print(L("\nPreview with `knobs apply <name> --dry-run`, apply with `knobs apply <name>`.", "\n用 `knobs apply <名称> --dry-run` 预览,用 `knobs apply <名称>` 应用。"))
+        return 0
     }
 
     // MARK: Talking to the app

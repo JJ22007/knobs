@@ -1,0 +1,20 @@
+{
+  "knobs": 1,
+  "about": "For demos and screen sharing: the display stays on, the desktop is clean, nothing pops up in a corner.",
+  "about.zh": "适合演示和共享屏幕:屏幕不熄灭、桌面干净、角落不会突然弹出东西。",
+  "settings": {
+    "awake.display": true,
+    "desktop.icons": false,
+    "desktop.widgets": false,
+    "dock.autohide": true,
+    "dock.recents": false,
+    "corners.topLeft": "1",
+    "corners.topRight": "1",
+    "corners.bottomLeft": "1",
+    "corners.bottomRight": "1",
+    "finder.externalDisksOnDesktop": false,
+    "finder.disksOnDesktop": false,
+    "finder.serversOnDesktop": false,
+    "apps.photosOnConnect": false
+  }
+}

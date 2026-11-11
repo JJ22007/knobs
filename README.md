@@ -24,7 +24,7 @@ Knobs is a small menu bar app with a settings window and a `knobs` command. It c
 
 - **No animation when switching Spaces, without disabling SIP.** Turn it on and your next `⌃←` / `⌃→` jumps straight to the desktop. Turn it off and the very next press slides again. No restart, no logout.
 - **Keep the display awake without `sudo`.** One switch, instant, and it gives your normal sleep timer back when you turn it off.
-- **Readable.** Over 90 settings in 13 groups, each with a plain description and the exact preference key behind it. Nothing is hidden in a shell script.
+- **Readable.** Over 110 settings in 13 groups, each with a plain description and the exact preference key behind it. Nothing is hidden in a shell script.
 - **Agent-ready.** `knobs list --json` tells an agent what every setting means; `knobs set` changes it. "Make my Mac feel faster" becomes a conversation.
 - **Portable.** `knobs export` writes one file. On a new Mac, hand that file to an agent and you get the same settings and the same shortcuts.
 
@@ -63,7 +63,7 @@ bash scripts/setup-signing.sh
 | Desktop & Windows | desktop icons, click wallpaper to reveal, Stage Manager, widgets, edge tiling, tile margins, ⌃⌘-drag windows from anywhere, title bar double-click, tabs |
 | Finder & Files | extensions, hidden files, path bar, status bar, default view, search scope, `.DS_Store`, save dialogs, empty Trash after 30 days, external disks on the desktop |
 | Keyboard & Typing | key repeat, press-and-hold, Tab through all controls, autocorrect, smart quotes and dashes, inline prediction |
-| Trackpad & Mouse | tap to click, three-finger drag, natural scrolling, Force Click, tracking speed |
+| Trackpad & Mouse | tap to click, click pressure, quiet clicks, three-finger drag, scroll inertia, natural scrolling, two-finger right click, look up, swipe between pages, tracking and scroll speed, double-click speed |
 | Screenshots | format, location, shadow, thumbnail, date in the file name |
 | System & Apps | scroll bars, sidebar icon size, reopen windows, interface sounds, volume feedback, stop Photos and Time Machine popping up for new devices |
 
@@ -114,7 +114,33 @@ knobs apply ~/Desktop/my-mac.knobs.json --dry-run   # see what would change
 knobs apply ~/Desktop/my-mac.knobs.json
 ```
 
-`examples/snappy.knobs.json` is a starter profile if you do not have one yet.
+## Share your setup
+
+A profile is a small, readable JSON file, so a setup travels like a dotfile: put it in a gist or a repo and anyone can apply it from the link.
+
+```bash
+knobs export my-mac.knobs.json                                  # then publish it as a gist, or commit it
+knobs apply https://gist.githubusercontent.com/you/…/raw/my-mac.knobs.json --dry-run
+knobs apply https://gist.githubusercontent.com/you/…/raw/my-mac.knobs.json
+```
+
+A brand-new Mac needs one line. It installs Knobs, shows what the profile changes, then applies it:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/JJ22007/knobs/main/scripts/bootstrap.sh | bash -s -- <preset, link or file>
+```
+
+Ready-made presets ship with the app (`knobs presets`), and pull requests with new ones are welcome in [`presets/`](presets):
+
+| Preset | For |
+|---|---|
+| `snappy` | no waiting on animations, a quiet Dock, a Finder that shows what is there |
+| `developer` | fast key repeat, no autocorrect or smart punctuation, every file and path visible |
+| `focus` | fewer things asking for attention, a clean desktop, no pop-ups when you plug things in |
+| `presenter` | demos and screen sharing: display stays on, clean desktop, quiet corners |
+| `jj22007` | the author's own Mac, including the [Paneful](https://github.com/JJ22007/paneful) shortcuts |
+
+Only settings in the catalog and the companion files listed in `Engine.swift` can be written by a profile, and `--dry-run` always shows the full list first. Read a stranger's profile before applying it, the same as any dotfile.
 
 ## Shortcuts
 

@@ -14,7 +14,7 @@
 
 输出语言跟随系统。需要固定语言时加环境变量:`KNOBS_LANG=en` 或 `KNOBS_LANG=zh`。设置的值始终用英文书写(`on`、`off`、数字、选项名)。
 
-按配置文件配置一台 Mac:先 `knobs apply <文件> --dry-run`,把清单给用户看,再 `knobs apply <文件>`。
+按配置文件配置一台 Mac:先 `knobs apply <文件|https 链接|预设名> --dry-run`,把清单给用户看,再去掉 `--dry-run` 应用。`knobs presets` 列出自带预设;新预设放进 `presets/`,`build.sh` 会校验。
 
 唯一不能替用户做的事,是授予"辅助功能"权限(无动画切换桌面需要它)。如果 `knobs set spaces.instant on` 提示正在等待权限,请用户到 系统设置 → 隐私与安全性 → 辅助功能 打开 Knobs。Knobs 一秒内就会发现,用 `knobs status` 确认。不要尝试自己授权,这个项目里的任何操作都不要用 `sudo`。
 
@@ -26,7 +26,7 @@
 - 所有给人看的文字都写成 `L("English", "中文")`。
 
 ```bash
-bash build.sh            # 编译、自检、校验 examples/
+bash build.sh            # 编译、自检、校验 presets/
 bash build.sh install    # 再安装到 ~/Applications,链接 ~/.local/bin/knobs 并启动
 ```
 

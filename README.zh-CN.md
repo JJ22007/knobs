@@ -18,7 +18,7 @@ Knobs 是一个菜单栏小应用,带一个设置窗口和一个 `knobs` 命令�
 
 - **切换桌面空间没有动画,而且不用关 SIP。** 打开后,下一次按 `⌃←` / `⌃→` 就直接跳过去。反悔了就关掉,下一次按键立刻恢复系统的滑动动画。不用重启,不用注销。
 - **屏幕常亮不需要 `sudo`。** 一个开关,立即生效;关掉后恢复你原来的熄屏时间。
-- **看得懂。** 90 多项设置,分成 13 组,每一项都有白话说明和背后真实的偏好设置键,没有藏在脚本里的东西。
+- **看得懂。** 110 多项设置,分成 13 组,每一项都有白话说明和背后真实的偏好设置键,没有藏在脚本里的东西。
 - **能交给 agent。** `knobs list --json` 告诉 agent 每一项是什么意思,`knobs set` 负责修改。
 - **能带走。** `knobs export` 导出一个文件。在新电脑上把它交给 agent,设置和快捷键就都一样了。
 
@@ -57,7 +57,7 @@ bash scripts/setup-signing.sh
 | 桌面与窗口 | 桌面图标、点按墙纸显示桌面、台前调度、小组件、贴边平铺、平铺边距、⌃⌘ 任意位置拖窗口、双击标题栏、标签页 |
 | 访达与文件 | 扩展名、隐藏文件、路径栏、状态栏、默认视图、搜索范围、`.DS_Store`、保存对话框、30 天后清倒废纸篓、桌面显示外置磁盘 |
 | 键盘与输入 | 按键重复、长按重音菜单、Tab 切换所有控件、自动纠正、智能引号与破折号、行内预测 |
-| 触控板与鼠标 | 轻点点按、三指拖移、自然滚动、用力点按、跟踪速度 |
+| 触控板与鼠标 | 轻点点按、点按力度、安静点按、三指拖移、滚动惯性、自然滚动、双指右键、三指查询、页面间轻扫、跟踪与滚动速度、连按速度 |
 | 截图 | 格式、保存位置、阴影、缩略图、文件名带日期 |
 | 系统与 App | 滚动条、边栏图标大小、恢复窗口、界面音效、音量反馈音、插入新设备时不弹“照片”和时间机器 |
 
@@ -108,7 +108,33 @@ knobs apply ~/Desktop/my-mac.knobs.json --dry-run   # 先看看会改什么
 knobs apply ~/Desktop/my-mac.knobs.json
 ```
 
-还没有自己的配置文件的话,可以从 `examples/snappy.knobs.json` 开始。
+## 分享你的设置
+
+配置文件是一个短小、看得懂的 JSON,所以设置可以像 dotfiles 一样传播:放进 gist 或仓库,别人用链接就能直接应用。
+
+```bash
+knobs export my-mac.knobs.json                                  # 然后发成 gist,或提交到仓库
+knobs apply https://gist.githubusercontent.com/you/…/raw/my-mac.knobs.json --dry-run
+knobs apply https://gist.githubusercontent.com/you/…/raw/my-mac.knobs.json
+```
+
+全新的 Mac 只要一行:装好 Knobs,先列出会改什么,再应用:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/JJ22007/knobs/main/scripts/bootstrap.sh | bash -s -- <预设名、链接或文件>
+```
+
+应用里自带几套现成预设(`knobs presets`),欢迎往 [`presets/`](presets) 提交你自己的:
+
+| 预设 | 适合 |
+|---|---|
+| `snappy` | 不等动画、安静的程序坞、什么都看得见的访达 |
+| `developer` | 按键重复快、不自动纠错不改标点、文件和路径全都看得见 |
+| `focus` | 打扰更少、桌面干净、插设备不乱弹窗 |
+| `presenter` | 演示和共享屏幕:屏幕不熄灭、桌面干净、角落安静 |
+| `jj22007` | 作者自己的 Mac,包括 [Paneful](https://github.com/JJ22007/paneful) 分屏快捷键 |
+
+配置文件只能写入清单里的设置,以及 `Engine.swift` 里列出的配套文件;`--dry-run` 会先把要改的全部列出来。应用陌生人的配置前先读一遍,和对待别人的 dotfiles 一样。
 
 ## 快捷键
 

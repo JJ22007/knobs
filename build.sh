@@ -21,6 +21,7 @@ BIN="$APP/Contents/MacOS/Knobs"
 rm -rf "$APP" build/obj
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" build/obj
 cp -R Resources/icons "$APP/Contents/Resources/icons"
+cp -R presets "$APP/Contents/Resources/presets"
 
 # The vendored C library that posts the synthetic swipe (see Vendor/ISS/LICENSE).
 for f in Vendor/ISS/*.c; do
@@ -64,7 +65,7 @@ fi
 
 "$BIN" --selftest | grep -v '^ok' || true
 "$BIN" --selftest >/dev/null || { echo "self-test failed"; exit 1; }
-for f in examples/*.json; do "$BIN" apply "$f" --dry-run >/dev/null || { echo "bad example profile: $f"; exit 1; }; done
+for f in presets/*.json; do "$BIN" apply "$f" --dry-run >/dev/null || { echo "bad preset: $f"; exit 1; }; done
 
 if [[ "${1:-}" == "install" ]]; then
     DEST="$HOME/Applications/Knobs.app"
