@@ -21,7 +21,8 @@ if ! xcrun --find swiftc >/dev/null 2>&1 && [ ! -x /Library/Developer/CommandLin
 fi
 
 if [ -d "$DIR/.git" ]; then
-    git -C "$DIR" pull -q --ff-only
+    # This clone belongs to the script, so follow the repository exactly, even after a rewrite.
+    git -C "$DIR" fetch -q origin && git -C "$DIR" reset -q --hard origin/main
 else
     mkdir -p "$(dirname "$DIR")"
     git clone -q --depth 1 "$REPO" "$DIR"
