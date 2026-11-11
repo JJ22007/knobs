@@ -178,7 +178,7 @@ struct MainView: View {
                 // The tag goes last: a modifier after .tag (such as .badge) can hide it from the
                 // List, and the row then cannot be selected.
                 IconLabel(title: L("All settings", "全部设置"), icon: "layout-grid").tag("all")
-                IconLabel(title: L("Changed by me", "我改过的"), icon: "pencil")
+                IconLabel(title: L("My setup", "我的设置"), icon: "pencil")
                     .badge(model.customized.count).tag("changed")
                 Section(L("Groups", "分组")) {
                     ForEach(Category.allCases, id: \.rawValue) { c in
@@ -195,6 +195,7 @@ struct MainView: View {
                     if model.needsPermission { PermissionBanner() }
                     if let banner = model.banner { MessageBanner(text: banner) { model.banner = nil } }
                     if model.selection == "all", model.search.isEmpty { QuickBar(model: model) }
+                    if model.selection == "changed" { SetupIntro(model: model) }
                     let groups = model.visible
                     if groups.isEmpty { EmptyState(changedOnly: model.selection == "changed") }
                     ForEach(groups, id: \.category.rawValue) { group in
@@ -243,7 +244,7 @@ struct QuickBar: View {
                 HStack(spacing: 12) {
                     icon("pencil")
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(L("Changed by me", "我改过的")).font(.callout.weight(.medium))
+                        Text(L("My setup", "我的设置")).font(.callout.weight(.medium))
                         Text(L("\(model.customized.count) of \(catalog.count) settings", "\(catalog.count) 项中的 \(model.customized.count) 项"))
                             .font(.caption).foregroundStyle(.secondary)
                     }
@@ -347,6 +348,28 @@ struct PermissionBanner: View {
     }
 }
 
+/// What "My setup" is, in plain words, with the one thing people do with it.
+struct SetupIntro: View {
+    @ObservedObject var model: Model
+    var body: some View {
+        HStack(alignment: .center, spacing: 14) {
+            Image(nsImage: lucide("pencil", size: 18)).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L("Everything on this Mac that differs from how macOS ships", "这台 Mac 上和出厂默认不一样的设置"))
+                    .font(.callout.weight(.medium))
+                Text(L("Changes made here, in System Settings or with `defaults write` all show up. This is exactly what Export saves for your next Mac. Reset hands a setting back to macOS.",
+                       "不管是在这里、在系统设置里,还是用 `defaults write` 改的,都会列在这里。“导出”带走的正是这些,换新电脑时一键恢复。点“恢复默认”就把这一项交还给 macOS。"))
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            Button(L("Export…", "导出…")) { model.exportProfile() }
+        }
+        .padding(14).frame(maxWidth: .infinity)
+        .background(RoundedRectangle(cornerRadius: 12).fill(cardFill))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(cardStroke))
+    }
+}
+
 struct MessageBanner: View {
     let text: String
     let dismiss: () -> Void
@@ -386,7 +409,7 @@ struct SettingRow: View {
                     if isLive, model.active.contains(setting.id) {
                         Circle().fill(Color.green).frame(width: 6, height: 6)
                         Text(L("Active", "已生效")).font(.caption).foregroundStyle(.secondary)
-                    } else if isChanged, !isLive { Pill(text: L("Changed", "已改")) }
+                    } else if isChanged, !isLive { Pill(text: L("Customized", "已自定义")) }
                     if setting.timing != .instant { Pill(text: setting.timing.label) }
                 }
                 Text(setting.detail).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
