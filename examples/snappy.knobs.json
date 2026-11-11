@@ -1,0 +1,32 @@
+{
+  "knobs": 1,
+  "about": "A starter profile: no waiting on animations, a quiet Dock, a Finder that shows what is there. Preview with `knobs apply examples/snappy.knobs.json --dry-run`.",
+  "settings": {
+    "spaces.instant": true,
+    "spaces.autoRearrange": false,
+    "motion.windowOpen": false,
+    "motion.windowResize": 0.001,
+    "motion.quickLook": 0,
+    "motion.finder": false,
+    "motion.dockLaunch": false,
+    "motion.minimize": "scale",
+    "dock.autohide": true,
+    "dock.autohideDelay": 0,
+    "dock.autohideSpeed": 0,
+    "dock.recents": false,
+    "desktop.clickToReveal": false,
+    "finder.extensions": true,
+    "finder.pathBar": true,
+    "finder.statusBar": true,
+    "finder.searchScope": "SCcf",
+    "keyboard.repeat": 2,
+    "keyboard.repeatDelay": 15,
+    "keyboard.pressAndHold": false,
+    "text.autocorrect": false,
+    "text.capitalize": false,
+    "text.smartQuotes": false,
+    "text.smartDashes": false,
+    "screenshots.thumbnail": false
+  },
+  "shortcuts": { "spaceLeft": "ctrl+left", "spaceRight": "ctrl+right" }
+}
