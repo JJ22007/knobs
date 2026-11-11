@@ -10,7 +10,7 @@
 <p align="center">
   <img src="docs/demo.gif" width="100%" alt="AI agent 打开屏幕常亮、关掉开窗动画并导出配置">
 </p>
-<p align="center"><sub>对 Claude Code(Haiku)说一句话,Knobs 窗口实时变化,随后导出配置给下一台 Mac。真实运行,agent 思考的几秒被缩短了。</sub></p>
+<p align="center"><sub>对 Claude Code(Haiku)说一句话,完全不提 Knobs:它自己找到 skill,实时改了两项设置并导出配置。真实运行,思考时间被缩短,路径里的账户名做了遮挡。</sub></p>
 
 Knobs 是一个菜单栏小应用,带一个设置窗口和一个 `knobs` 命令。它把开发者常从 dotfiles 里复制的那些调整(`defaults write …`、`pmset …`、yabai)收到一起,给每一项起了名字、写了说明、配了开关,并且如实标注它什么时候生效。
 
@@ -21,6 +21,19 @@ Knobs 是一个菜单栏小应用,带一个设置窗口和一个 `knobs` 命令�
 - **看得懂。** 110 多项设置,分成 13 组,每一项都有白话说明和背后真实的偏好设置键,没有藏在脚本里的东西。
 - **能交给 agent。** `knobs list --json` 告诉 agent 每一项是什么意思,`knobs set` 负责修改。
 - **能带走。** `knobs export` 导出一个文件。在新电脑上把它交给 agent,设置和快捷键就都一样了。
+
+## 和其他做法比
+
+| | `.macos` 脚本 | nix-darwin | 图形化调节工具 | Knobs |
+|---|---|---|---|---|
+| 看得懂每项设置是做什么的 | 靠注释 | 选项文档 | 能 | 能,还标出系统默认值和生效时机 |
+| 系统允许时无需注销即生效 | 要 `killall` | 要重新构建 | 大多可以 | 可以,做不到时会如实说明 |
+| 不关 SIP 实现无动画切换桌面 | 不能 | 不能 | 不能 | 能 |
+| AI agent 能读、能解释、能修改 | 只能直接写 `defaults` | 要改 Nix | 不能 | `knobs list --json`、Claude Code skill、退出码 |
+| 分享一套设置 | 复制脚本 | 分享 flake | 很少支持 | 一个 JSON 文件、一个链接或一个预设 |
+| 撤销 | 自己写 | 回滚 | 部分支持 | 每次 apply 后都能 `knobs undo` |
+
+Knobs 不是要取代完整的 dotfiles 或 Nix 配置。它是那一部分:谁都能用、能交给 agent、一分钟就能读懂。
 
 ## 安装
 
@@ -135,6 +148,8 @@ curl -fsSL https://raw.githubusercontent.com/JJ22007/knobs/main/scripts/bootstra
 | `jj22007` | 作者自己的 Mac,包括 [Paneful](https://github.com/JJ22007/paneful) 分屏快捷键 |
 
 配置文件只能写入清单里的设置,以及 `Engine.swift` 里列出的配套文件;`--dry-run` 会先把要改的全部列出来。应用陌生人的配置前先读一遍,和对待别人的 dotfiles 一样。
+
+每次 `knobs apply`(以及窗口里的"导入")都会先在 `~/.config/knobs/backups` 存一份快照。`knobs undo` 把所有设置恢复原样,原本没改过的也会交还给 macOS;`knobs undo --list` 列出所有快照。
 
 ## 快捷键
 

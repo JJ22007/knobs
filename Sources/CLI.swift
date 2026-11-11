@@ -8,7 +8,7 @@
 import AppKit
 
 enum CLI {
-    static let commands: Set<String> = ["list", "get", "describe", "set", "reset", "export", "apply", "shortcut", "status", "open", "skill", "presets", "help", "--help", "-h"]
+    static let commands: Set<String> = ["list", "get", "describe", "set", "reset", "export", "apply", "shortcut", "status", "open", "skill", "presets", "undo", "help", "--help", "-h"]
 
     private static let usageEN = """
     knobs: read and change macOS settings from scripts and agents.
@@ -23,6 +23,7 @@ enum CLI {
       knobs apply <file|https-url|preset> [--dry-run]
                                                    apply a profile; --dry-run only lists the changes
       knobs presets                                ready-made profiles you can apply by name
+      knobs undo [--list]                          put back the settings from before the last apply
       knobs status                                 is the app running, and are the live features active
       knobs open                                   open the Knobs window
       knobs skill [install|remove]                 teach Claude Code about knobs in every folder (a user-level skill)
@@ -44,6 +45,7 @@ enum CLI {
       knobs apply <文件|https 链接|预设名> [--dry-run]
                                                    应用配置文件;--dry-run 只列出会改什么
       knobs presets                                列出可以直接按名字应用的现成配置
+      knobs undo [--list]                          恢复到上一次 apply 之前的设置
       knobs status                                 应用是否在运行,实时功能是否生效
       knobs open                                   打开 Knobs 窗口
       knobs skill [install|remove]                 让 Claude Code 在任何文件夹都认识 knobs(用户级 skill)
@@ -75,6 +77,7 @@ enum CLI {
         case "open": return launchApp(background: false) ? 0 : 1
         case "skill": return skill(rest.first ?? "print")
         case "presets": return presets()
+        case "undo": return undo(list: flag("--list"))
         default: print(usage); return 0
         }
     }
@@ -94,7 +97,7 @@ enum CLI {
 
         # knobs
 
-        `\(expandTilde("~/.local/bin/knobs"))` changes macOS settings safely: every setting has an id, a plain description, its macOS default, and an honest note on when a change takes effect. No sudo, ever.
+        `~/.local/bin/knobs` (just `knobs` if ~/.local/bin is on PATH) changes macOS settings safely: every setting has an id, a plain description, its macOS default, and an honest note on when a change takes effect. No sudo, ever.
 
         1. Find the setting: `knobs list --json` (all \(catalog.count)), or `knobs list <category>` for one of: \(Category.allCases.map { $0.rawValue }.joined(separator: ", ")).
         2. Change only what the user asked for: `knobs set <id> <value> [<id> <value> ...]`. Values are `on`/`off`, a number, or one of the `options` values. Exit code 1 means something was refused; the reason is on stderr.
@@ -301,6 +304,7 @@ enum CLI {
             print(L("\(report.changed.count) \(dryRun ? "to change" : "changed"), \(report.unchanged) already matched.", "\(dryRun ? "将更改" : "已更改") \(report.changed.count) 项,\(report.unchanged) 项本来就一致。"))
             report.problems.forEach { _ = fail($0) }
             if !dryRun { notifyApp() }
+            if !dryRun, !report.changed.isEmpty { print(L("Changed your mind? `knobs undo` puts everything back.", "后悔了?运行 `knobs undo` 即可全部恢复。")) }
             let liveIDs = dryRun ? [] : catalog.filter { if case .live = $0.backing { return Engine.current($0) == .bool(true) }; return false }.map { $0.id }
             return max(report.problems.isEmpty ? 0 : 1, reportLive(liveIDs))
         } catch { return fail("\(error)") }
@@ -343,6 +347,27 @@ enum CLI {
         }
         return .failure(KnobsError(L("no file, link or preset called \"\(source)\". Presets: \(presetNames().joined(separator: ", "))",
                                      "找不到名为“\(source)”的文件、链接或预设。可用预设:\(presetNames().joined(separator: ", "))")))
+    }
+
+    private static func undo(list: Bool) -> Int32 {
+        let all = Profile.backups()
+        if list {
+            if all.isEmpty { print(L("No snapshots yet. One is saved every time a profile is applied.", "还没有快照。每次应用配置前都会自动存一份。")) }
+            all.forEach { print($0) }
+            return 0
+        }
+        guard let latest = all.first, let text = try? String(contentsOfFile: latest, encoding: .utf8) else {
+            return fail(L("nothing to undo: no profile has been applied yet", "没有可撤销的:还没有应用过配置"))
+        }
+        do {
+            let report = try Profile.apply(text: text, dryRun: false, snapshot: false)
+            report.changed.forEach { print(L("restored \($0)", "已恢复 \($0)")) }
+            print(L("\(report.changed.count) restored from \(latest)", "已从 \(latest) 恢复 \(report.changed.count) 项"))
+            try? FileManager.default.removeItem(atPath: latest)
+            report.problems.forEach { _ = fail($0) }
+            notifyApp()
+            return report.problems.isEmpty ? 0 : 1
+        } catch { return fail("\(error)") }
     }
 
     private static func presets() -> Int32 {

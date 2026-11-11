@@ -119,7 +119,7 @@ final class Model: ObservableObject {
             let done = try Profile.apply(text: text, dryRun: false)
             AppDelegate.shared.reload(askForPermission: true)
             refresh()
-            banner = L("Applied \(done.changed.count) changes.", "已应用 \(done.changed.count) 项更改。")
+            banner = L("Applied \(done.changed.count) changes. A snapshot was saved first: `knobs undo` puts everything back.", "已应用 \(done.changed.count) 项更改。应用前已自动存了快照,运行 `knobs undo` 即可全部恢复。")
                 + (done.problems.isEmpty ? "" : " " + done.problems.joined(separator: "; "))
         } catch { banner = "\(error)" }
     }
@@ -244,9 +244,9 @@ struct QuickBar: View {
                 HStack(spacing: 12) {
                     icon("pencil")
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(L("My setup", "我的设置")).font(.callout.weight(.medium))
+                        Text(L("My setup", "我的设置")).font(.callout.weight(.medium)).lineLimit(1).fixedSize()
                         Text(L("\(model.customized.count) of \(catalog.count) settings", "\(catalog.count) 项中的 \(model.customized.count) 项"))
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(1).fixedSize()
                     }
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)

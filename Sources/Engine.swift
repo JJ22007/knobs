@@ -225,6 +225,41 @@ enum Profile {
         ]
     }
 
+    // MARK: Snapshots, so a profile can be undone
+
+    static var backupDirectory: String { expandTilde("~/.config/knobs/backups") }
+
+    /// Everything as it is now, including which settings are untouched, so applying the
+    /// snapshot later puts the Mac back exactly (settings a profile turned on get reset).
+    static func snapshot() -> [String: Any] {
+        var obj = export()
+        obj["about"] = "A Knobs snapshot taken automatically before a profile was applied. `knobs undo` restores it."
+        obj["reset"] = catalog.filter { s in
+            if case .live = s.backing { return Engine.current(s) != .bool(true) }
+            return Engine.current(s) == nil
+        }.map { $0.id }
+        return obj
+    }
+
+    /// Saves a snapshot and keeps the newest 20. Returns its path.
+    @discardableResult
+    static func saveSnapshot() -> String? {
+        let fm = FileManager.default
+        try? fm.createDirectory(atPath: backupDirectory, withIntermediateDirectories: true)
+        let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        let path = backupDirectory + "/\(stamp).knobs.json"
+        guard let data = try? JSONSerialization.data(withJSONObject: snapshot(), options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
+              fm.createFile(atPath: path, contents: data) else { return nil }
+        for old in backups().dropFirst(20) { try? fm.removeItem(atPath: old) }
+        return path
+    }
+
+    /// Snapshot paths, newest first.
+    static func backups() -> [String] {
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: backupDirectory)) ?? []
+        return files.filter { $0.hasSuffix(".knobs.json") }.sorted(by: >).map { backupDirectory + "/" + $0 }
+    }
+
     static func exportText() -> String {
         let data = (try? JSONSerialization.data(withJSONObject: export(), options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])) ?? Data()
         return String(decoding: data, as: UTF8.self) + "\n"
@@ -237,15 +272,29 @@ enum Profile {
     }
 
     /// Apply a profile. With `dryRun` nothing is written and the report says what would change.
-    static func apply(text: String, dryRun: Bool) throws -> Report {
+    static func apply(text: String, dryRun: Bool, snapshot: Bool = true) throws -> Report {
         guard let obj = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any] else {
             throw KnobsError(L("not a JSON object", "不是有效的 JSON 文件"))
         }
         guard obj["knobs"] != nil, let settings = obj["settings"] as? [String: Any] else {
             throw KnobsError(L("not a Knobs profile (missing \"knobs\" or \"settings\")", "不是 Knobs 配置文件(缺少 knobs 或 settings 字段)"))
         }
+        // Before changing anything, remember how things were so `knobs undo` can put them back.
+        if !dryRun, snapshot, let preview = try? apply(text: text, dryRun: true), !preview.changed.isEmpty {
+            saveSnapshot()
+        }
         var report = Report()
         var restart = Set<String>()
+
+        // A snapshot lists the settings that were untouched; hand those back to macOS.
+        for id in (obj["reset"] as? [String] ?? []).sorted() {
+            guard let s = catalogByID[id], settings[id] == nil else { continue }
+            let now = Engine.current(s)
+            let isOn: Bool = { if case .live = s.backing { return now == .bool(true) }; return now != nil }()
+            guard isOn else { continue }
+            report.changed.append("\(id): \(now.map { "\($0)" } ?? "") → \(L("macOS default", "macOS 默认"))")
+            if !dryRun { restart.formUnion(Engine.reset(s)) }
+        }
 
         for id in settings.keys.sorted() {
             guard let s = catalogByID[id] else { report.problems.append(L("\(id): unknown setting, skipped", "\(id):不认识的设置,已跳过")); continue }

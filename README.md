@@ -16,7 +16,7 @@
 <p align="center">
   <img src="docs/demo.gif" width="100%" alt="An AI agent keeps the display awake, turns off window animations and exports the setup">
 </p>
-<p align="center"><sub>One sentence to Claude Code (Haiku), and Knobs changes live, then exports the setup for the next Mac. Real run; the seconds the agent spends thinking are shortened.</sub></p>
+<p align="center"><sub>One sentence to Claude Code (Haiku), with no hint about Knobs: it finds the skill, changes two settings live and exports the setup. Real run; thinking time is shortened and the account name in paths is masked.</sub></p>
 
 Knobs is a small menu bar app with a settings window and a `knobs` command. It collects the tweaks developers usually paste from dotfiles (`defaults write …`, `pmset …`, yabai) and gives each one a name, an explanation, a switch, and an honest note about when it takes effect.
 
@@ -27,6 +27,19 @@ Knobs is a small menu bar app with a settings window and a `knobs` command. It c
 - **Readable.** Over 110 settings in 13 groups, each with a plain description and the exact preference key behind it. Nothing is hidden in a shell script.
 - **Agent-ready.** `knobs list --json` tells an agent what every setting means; `knobs set` changes it. "Make my Mac feel faster" becomes a conversation.
 - **Portable.** `knobs export` writes one file. On a new Mac, hand that file to an agent and you get the same settings and the same shortcuts.
+
+## How it compares
+
+| | `.macos` scripts | nix-darwin | GUI tweakers | Knobs |
+|---|---|---|---|---|
+| Readable list of what each setting does | comments | option docs | yes | yes, with the macOS default and when it applies |
+| Takes effect without a logout when macOS allows | after `killall` | after rebuild | mostly | yes, and says honestly when it cannot |
+| Instant Space switching without disabling SIP | no | no | no | yes |
+| An AI agent can read, explain and change it | raw `defaults` | edit Nix | no | `knobs list --json`, a Claude Code skill, exit codes |
+| Share a setup | copy the script | share the flake | rarely | one JSON file, a link, or a preset |
+| Undo | write it yourself | roll back | some | `knobs undo` after every apply |
+
+Knobs is not a replacement for a full dotfiles or Nix setup. It is the part you can hand to anyone, or to an agent, and read in a minute.
 
 ## Install
 
@@ -141,6 +154,8 @@ Ready-made presets ship with the app (`knobs presets`), and pull requests with n
 | `jj22007` | the author's own Mac, including the [Paneful](https://github.com/JJ22007/paneful) shortcuts |
 
 Only settings in the catalog and the companion files listed in `Engine.swift` can be written by a profile, and `--dry-run` always shows the full list first. Read a stranger's profile before applying it, the same as any dotfile.
+
+Every `knobs apply` (and Import in the window) first saves a snapshot to `~/.config/knobs/backups`. `knobs undo` puts every setting back the way it was, including handing untouched ones back to macOS; `knobs undo --list` shows the snapshots.
 
 ## Shortcuts
 
