@@ -1,8 +1,8 @@
 <h1 align="center">Knobs</h1>
 
 <p align="center">
-  <b>把值得改的 macOS 设置,放进一张看得懂的清单里。</b><br>
-  拨一下开关立刻生效,也可以让 agent 替你拨。换新电脑时,一个文件带走全部习惯。
+  <b>让 AI agent 改 Mac 设置时不再瞎猜。</b><br>
+  112 项常用设置,每项写明含义、macOS 默认值和什么时候生效;写完回读确认,一条命令撤销整套配置。
 </p>
 
 <p align="center"><a href="README.md">English</a></p>
@@ -10,30 +10,39 @@
 <p align="center">
   <img src="docs/demo.gif" width="100%" alt="AI agent 打开屏幕常亮、关掉开窗动画并导出配置">
 </p>
-<p align="center"><sub>对 Claude Code(Haiku)说一句话,完全不提 Knobs:它自己找到 skill,实时改了两项设置并导出配置。真实运行,思考时间被缩短,路径里的账户名做了遮挡。</sub></p>
+<p align="center"><sub>对 Claude Code(Haiku)说一句话,完全不提 Knobs:它自己找到 skill,实时改了两项设置并导出配置。真实运行,思考时间被缩短,路径里的账户名做了遮挡。Knobs 的开发过程用了 AI 编程 agent。</sub></p>
 
-Knobs 是一个菜单栏小应用,带一个设置窗口和一个 `knobs` 命令。它把开发者常从 dotfiles 里复制的那些调整(`defaults write …`、`pmset …`、yabai)收到一起,给每一项起了名字、写了说明、配了开关,并且如实标注它什么时候生效。
+Knobs 是一个 `knobs` 命令,外加一个菜单栏小应用和设置窗口。它把大家常从 dotfiles 里复制的那些调整(`defaults write …`)收到一起,给每一项起了 id、写了说明、列出合法取值,并标注它什么时候生效。
 
 ## 为什么做这个
 
-- **切换桌面空间没有动画,而且不用关 SIP。** 打开后,下一次按 `⌃←` / `⌃→` 就直接跳过去。反悔了就关掉,下一次按键立刻恢复系统的滑动动画。不用重启,不用注销。
-- **屏幕常亮不需要 `sudo`。** 一个开关,立即生效;关掉后恢复你原来的熄屏时间。
-- **看得懂。** 110 多项设置,分成 13 组,每一项都有白话说明和背后真实的偏好设置键,没有藏在脚本里的东西。
-- **能交给 agent。** `knobs list --json` 告诉 agent 每一项是什么意思,`knobs set` 负责修改。
-- **能带走。** `knobs export` 导出一个文件。在新电脑上把它交给 agent,设置和快捷键就都一样了。
+agent 自己就会跑 `defaults write`。问题出在之后:它记得的键可能早就失效了;写进去 macOS 接没接受,它不知道;要不要重启程序坞、要不要注销,它也不知道;改错了没法撤销。Knobs 就是回答这四个问题的那一层。
+
+- **带类型的设置目录。** `knobs list --json` 给出每一项的 id、含义、合法取值、当前值、macOS 默认值和生效时机。
+- **写入有校验。** `knobs set` 拒绝不合法的值,写完回读;macOS 没接受就以退出码 1 结束,原因写在 stderr。只有值真的变了才重启程序坞或访达。
+- **能撤销。** 每次 `knobs apply` 前先存快照,`knobs undo` 把所有设置恢复原样,原本没改过的也会交还给 macOS。单条 `knobs set` 目前还不存快照,可以用 `knobs reset <id>` 把单项交还给 macOS。
+- **看得懂,带得走。** 112 项设置,分成 13 组,每一项都有背后真实的偏好设置键。`knobs export` 导出一个 JSON 文件,可以从文件、链接或预设套用到另一台 Mac。
+
+顺带包含的功能(只是方便,不是选 Knobs 的理由):
+
+- **无动画切换桌面来自 jurplel 的 [InstantSpaceSwitcher](https://github.com/jurplel/InstantSpaceSwitcher)(MIT 许可)。** 代码放在 `Vendor/ISS`,Knobs 只是把这个开关和其他设置放在一起、写进配置文件。如果你只想要无动画切换,请直接装 InstantSpaceSwitcher:它有 Homebrew cask 和预编译安装包。
+- **屏幕常亮**,用的是和系统自带 `caffeinate` 相同的电源断言。
 
 ## 和其他做法比
 
-| | `.macos` 脚本 | nix-darwin | 图形化调节工具 | Knobs |
+| | [TinkerTool](https://www.bresink.com/osx/TinkerTool.html) | [PowerChest](https://github.com/scripsweave/PowerChest) | [nix-darwin](https://github.com/nix-darwin/nix-darwin) | Knobs |
 |---|---|---|---|---|
-| 看得懂每项设置是做什么的 | 靠注释 | 选项文档 | 能 | 能,还标出系统默认值和生效时机 |
-| 系统允许时无需注销即生效 | 要 `killall` | 要重新构建 | 大多可以 | 可以,做不到时会如实说明 |
-| 不关 SIP 实现无动画切换桌面 | 不能 | 不能 | 不能 | 能 |
-| AI agent 能读、能解释、能修改 | 只能直接写 `defaults` | 要改 Nix | 不能 | `knobs list --json`、Claude Code skill、退出码 |
-| 分享一套设置 | 复制脚本 | 分享 flake | 很少支持 | 一个 JSON 文件、一个链接或一个预设 |
-| 撤销 | 自己写 | 回滚 | 部分支持 | 每次 apply 后都能 `knobs undo` |
+| 是什么 | 免费的隐藏设置图形工具 | 开源的隐藏设置图形工具 | 声明式管理整台 Mac | 带命令行的设置目录,给 agent 用,也有图形界面 |
+| 设置数量 | 比 Knobs 多 | 80+(README) | 程序坞、访达、全局设置,以及多得多的东西 | 112 |
+| agent 能列出、校验、修改设置 | 不能 | 不能 | 要改 Nix 文件 | `knobs list --json`、`knobs set`、退出码 |
+| 标注每项什么时候生效 | 部分设置有 | 需要时自动重启程序坞或访达 | 重新构建后 | 每一项都标:立即、之后打开的 App、注销后 |
+| 撤销 | 恢复到原始状态 | 每次修改前存快照 | 回滚到上一代 | 每次 `apply` 前存快照,`set` 还不存 |
+| 分享一套设置 | 不支持 | 导出导入配置文件 | 分享 flake | 一个 JSON 文件、一个链接或一个预设 |
+| 安装 | 签名安装包 | DMG 下载 | Nix | 用 Command Line Tools 从源码编译,还没有签名安装包 |
 
-Knobs 不是要取代完整的 dotfiles 或 Nix 配置。它是那一部分:谁都能用、能交给 agent、一分钟就能读懂。
+Knobs 更差的地方:设置比 TinkerTool 少,还没有签名安装包和 Homebrew cask,PowerChest 单条修改也存快照。Knobs 也不是要取代完整的 dotfiles 或 Nix 配置。
+
+**为什么不直接用 `defaults write`、nix-darwin、TinkerTool 或 PowerChest?** 合适就用它们。Knobs 要替代的,正是 agent 凭记忆写 `defaults write`;nix-darwin 管得多得多,但要学 Nix、要重新构建;TinkerTool 和 PowerChest 是好用的图形工具,但没有 agent 能调用的接口。当你想让 agent 改 Mac 设置,同时清楚它改了什么、改成没有、怎么撤回,就用 Knobs。
 
 ## 安装
 
@@ -84,7 +93,7 @@ bash scripts/setup-signing.sh
 
 ## 让 agent 来操作
 
-`build.sh install` 还会在 `~/.claude/skills/knobs` 装一个 [Claude Code skill](https://docs.claude.com/en/docs/claude-code/skills),Claude Code 在任何文件夹都认识 Knobs:随便在哪儿说一句“别让我的屏幕熄灭”,它会自己用上 `knobs`。`knobs skill remove` 可以移除;`knobs skill` 会把内容打印出来,方便交给其他 agent。其他 agent 可以读 [AGENTS.md](AGENTS.md)。
+如果你用 Claude Code,`build.sh install` 会询问是否在 `~/.claude/skills/knobs` 装一个 [Claude Code skill](https://docs.claude.com/en/docs/claude-code/skills),这样 Claude Code 在任何文件夹都认识 Knobs:随便在哪儿说一句“别让我的屏幕熄灭”,它会自己用上 `knobs`。不回答“是”(或设置 `KNOBS_SKILL=1`)就不会往那里写任何东西;已经装过的 Knobs skill 会保持更新。之后可以用 `knobs skill install` 安装,`knobs skill remove` 移除;`knobs skill` 会把内容打印出来,方便交给其他 agent。其他 agent 可以读 [AGENTS.md](AGENTS.md)。
 
 ```bash
 knobs list --json              # 每项设置:id、含义、可接受的值、当前值、何时生效
@@ -109,7 +118,7 @@ knobs status
 knobs export ~/Desktop/my-mac.knobs.json
 ```
 
-这个文件包含你改过的所有设置、切换空间的快捷键,以及配套工具的配置([Paneful](https://github.com/JJ22007/paneful) 的分屏快捷键)。文件里自带使用说明,所以在新电脑上把它交给任何一个编程 agent,说一句:
+这个文件包含你改过的所有设置、切换空间的快捷键,以及已知配套工具的配置文件。目前清单里只有一项:`~/.config/paneful/config.json`,属于作者自己的分屏工具 [Paneful](https://github.com/JJ22007/paneful);只有这个文件存在时才会导出,清单写在 `Sources/Engine.swift` 的 `Profile.companionFiles` 里。文件里自带使用说明,所以在新电脑上把它交给任何一个编程 agent,说一句:
 
 > 按照 `my-mac.knobs.json` 把这台 Mac 配置好。
 
@@ -137,7 +146,7 @@ knobs apply https://gist.githubusercontent.com/you/…/raw/my-mac.knobs.json
 curl -fsSL https://raw.githubusercontent.com/JJ22007/knobs/main/scripts/bootstrap.sh | bash -s -- <预设名、链接或文件>
 ```
 
-应用里自带几套现成预设(`knobs presets`),欢迎往 [`presets/`](presets) 提交你自己的:
+应用里自带几套现成预设(`knobs presets`),欢迎往 [`presets/`](presets) 提交你自己的。[`examples/`](examples) 里放着作者自己的配置,作为真实的例子,不会打包进应用。
 
 | 预设 | 适合 |
 |---|---|
@@ -145,7 +154,6 @@ curl -fsSL https://raw.githubusercontent.com/JJ22007/knobs/main/scripts/bootstra
 | `developer` | 按键重复快、不自动纠错不改标点、文件和路径全都看得见 |
 | `focus` | 打扰更少、桌面干净、插设备不乱弹窗 |
 | `presenter` | 演示和共享屏幕:屏幕不熄灭、桌面干净、角落安静 |
-| `jj22007` | 作者自己的 Mac,包括 [Paneful](https://github.com/JJ22007/paneful) 分屏快捷键 |
 
 配置文件只能写入清单里的设置,以及 `Engine.swift` 里列出的配套文件;`--dry-run` 会先把要改的全部列出来。应用陌生人的配置前先读一遍,和对待别人的 dotfiles 一样。
 

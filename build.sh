@@ -65,7 +65,7 @@ fi
 
 "$BIN" --selftest | grep -v '^ok' || true
 "$BIN" --selftest >/dev/null || { echo "self-test failed"; exit 1; }
-for f in presets/*.json; do "$BIN" apply "$f" --dry-run >/dev/null || { echo "bad preset: $f"; exit 1; }; done
+for f in presets/*.json examples/*.json; do "$BIN" apply "$f" --dry-run >/dev/null || { echo "bad preset: $f"; exit 1; }; done
 
 if [[ "${1:-}" == "install" ]]; then
     DEST="$HOME/Applications/Knobs.app"
@@ -76,7 +76,25 @@ if [[ "${1:-}" == "install" ]]; then
     ln -sf "$DEST/Contents/MacOS/Knobs" "$HOME/.local/bin/knobs"
     open "$DEST" ${KNOBS_BACKGROUND:+--args --background}
     echo "installed and launched: $DEST"
-    # Claude Code finds knobs in any folder through a user-level skill. Skip with KNOBS_NO_SKILL=1.
-    if [ -d "$HOME/.claude" ] && [ -z "${KNOBS_NO_SKILL:-}" ]; then "$DEST/Contents/MacOS/Knobs" skill install; fi
+    # Claude Code finds knobs in any folder through a user-level skill. Nothing is written to ~/.claude without
+    # a yes: KNOBS_SKILL=1 says yes, KNOBS_SKILL=0 says no, otherwise ask on the terminal. A skill that is
+    # already installed is kept up to date, since the user said yes to it before.
+    SKILL_FILE="$HOME/.claude/skills/knobs/SKILL.md"
+    if [ -d "$HOME/.claude" ] && [ "${KNOBS_SKILL:-}" != "0" ] && [ -z "${KNOBS_NO_SKILL:-}" ]; then
+        ANSWER="${KNOBS_SKILL:-}"
+        if [ -f "$SKILL_FILE" ]; then
+            ANSWER=1
+        elif [ -z "$ANSWER" ] && { exec 3<>/dev/tty; } 2>/dev/null; then
+            printf "Add a Claude Code skill at ~/.claude/skills/knobs so Claude Code can use knobs in any folder? [y/N] " >&3
+            read -r REPLY <&3 || REPLY=""
+            exec 3<&-
+            case "$REPLY" in [yY]*) ANSWER=1 ;; esac
+        fi
+        if [ "$ANSWER" = "1" ]; then
+            "$DEST/Contents/MacOS/Knobs" skill install
+        else
+            echo "Claude Code skill not installed. Add it any time with: ~/.local/bin/knobs skill install"
+        fi
+    fi
     echo "command line: ~/.local/bin/knobs (add ~/.local/bin to your PATH to type just \`knobs\`)"
 fi
