@@ -14,7 +14,7 @@ The command is `~/.local/bin/knobs` (a link into `~/Applications/Knobs.app`). If
 
 Every command that reports something takes `--json`: `list`, `describe`, `get`, `set`, `reset`, `apply`, `undo`, `status`, `verify`.
 
-Scenes: `knobs scene` lists them and `knobs scene <name> [--dry-run] [--json]` switches. A scene is a profile that may also carry `"overbright": {"percent": N}`; Knobs then calls `overbright mcp` and reports Overbright's readback (`reached` or `restored` proves it). The snapshot includes the brightness, so `knobs undo` restores it too. Over MCP, use `apply_profile` with the scene name.
+Scenes: `knobs scene` lists them and `knobs scene <name> [--dry-run] [--json]` switches. A scene is a profile that may also carry `"overbright": {"percent": N}`; Knobs then calls `overbright mcp` and reports Overbright's readback (`reached` or `restored` proves it). A scene may also carry `"paneful": {"layout": [{app or title, x, y, w, h, display?}]}` (screen fractions); Knobs calls `paneful mcp` `apply_layout` and the result is verified only if every window reached its frame. The snapshot includes the brightness and Paneful's saved window layout, so `knobs undo` restores both. Over MCP, use `apply_profile` with the scene name.
 
 `knobs verify` is read-only: for every key already written on this Mac it checks that macOS stores it in the shape the catalog expects, and lists any mismatch. Keys that were never written cannot be checked this way.
 

@@ -14,7 +14,7 @@
 
 所有会输出结果的命令都支持 `--json`:`list`、`describe`、`get`、`set`、`reset`、`apply`、`undo`、`status`、`verify`。
 
-场景:`knobs scene` 列出场景,`knobs scene <名称> [--dry-run] [--json]` 切换。场景就是可以额外带 `"overbright": {"percent": N}` 的配置文件;Knobs 会调用 `overbright mcp`,并报告 Overbright 的回读结果(`reached` 或 `restored` 表示已证实)。快照里包含亮度,所以 `knobs undo` 也会还原亮度。通过 MCP 时,用 `apply_profile` 加场景名。
+场景:`knobs scene` 列出场景,`knobs scene <名称> [--dry-run] [--json]` 切换。场景就是可以额外带 `"overbright": {"percent": N}` 的配置文件;Knobs 会调用 `overbright mcp`,并报告 Overbright 的回读结果(`reached` 或 `restored` 表示已证实)。场景还可以带 `"paneful": {"layout": [{app 或 title, x, y, w, h, display?}]}`(屏幕比例);Knobs 会调用 `paneful mcp` 的 `apply_layout`,只有每个窗口都到达指定位置才算已证实。快照里包含亮度和 Paneful 存下的窗口布局,所以 `knobs undo` 会把两者一起还原。通过 MCP 时,用 `apply_profile` 加场景名。
 
 `knobs verify` 只读:对这台 Mac 上已经写入的每个键,检查 macOS 存的类型和取值是否符合目录,并列出不符合的。从没写过的键没法用这种方法检查。
 

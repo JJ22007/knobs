@@ -125,7 +125,7 @@ knobs status
 
 ## 场景:设置和其他工具一起切换
 
-场景就是一个配置文件,只是它还能通过其他工具自己的 agent 接口去控制它们。目前支持的是作者的亮度工具 [Overbright](https://github.com/JJ22007/overbright):场景可以设置内建屏幕的亮度,并由 Overbright 读回屏幕的实际亮度,证明真的生效了。
+场景就是一个配置文件,只是它还能通过其他工具自己的 agent 接口去控制它们。目前支持作者的另外两个工具:[Overbright](https://github.com/JJ22007/overbright) 设置内建屏幕的亮度,并读回屏幕的实际亮度证明真的生效;[Paneful](https://github.com/JJ22007/paneful) 摆放窗口,并读回每个窗口的实际位置。
 
 ```bash
 knobs scene                      # 列出场景
@@ -134,9 +134,9 @@ knobs scene present              # 切换
 knobs undo                       # 全部还原,亮度也会还原
 ```
 
-`present`(演示模式)会让屏幕不熄灭、隐藏桌面图标和小组件、自动隐藏程序坞、关掉触发角,并用 Overbright 把屏幕提亮到 130%。整个切换只存一份快照,所以一次 `knobs undo` 就能把设置和亮度一起还原。没装 Overbright 时会跳过亮度并在结果里说明。勿扰模式不在其中:专注模式没有 Knobs 能写入并回读确认的设置。
+`present`(演示模式)会让屏幕不熄灭、隐藏桌面图标和小组件、自动隐藏程序坞、关掉触发角,并用 Overbright 把屏幕提亮到 130%。整个切换只存一份快照,所以一次 `knobs undo` 就能把设置和亮度一起还原。没装 Overbright 时会跳过亮度并在结果里说明。[`examples/present-keynote.knobs.json`](examples/present-keynote.knobs.json) 多了窗口布局:由 Paneful 让 Keynote 窗口铺满屏幕,同一次 `knobs undo` 会把所有窗口放回原处。勿扰模式不在其中:专注模式没有 Knobs 能写入并回读确认的设置。
 
-想在自己的配置里加上亮度,写 `"overbright": { "percent": 130 }`(0–100 是背光,100 以上是增亮)。Knobs 调用的是 `overbright mcp`,不会去改 Overbright 的文件。
+想在自己的配置里加上亮度,写 `"overbright": { "percent": 130 }`(0–100 是背光,100 以上是增亮)。Knobs 调用的是 `overbright mcp`,不会去改 Overbright 的文件。想摆放窗口,写 `"paneful": { "layout": [{ "app": "Keynote", "x": 0, "y": 0, "w": 1, "h": 1 }] }`(位置是从左上角算起的屏幕比例;每个窗口要写 `app` 或 `title` 来挑窗口,`display` 选屏幕)。Knobs 调用 `paneful mcp`,报告每个窗口的回读结果;存下的窗口布局只留在这台 Mac 的快照里。
 
 ## 换新电脑
 

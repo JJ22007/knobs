@@ -131,7 +131,7 @@ The "Agent prompt" button in the window copies a ready-made version. The exit co
 
 ## Scenes: settings and other tools together
 
-A scene is a profile that can also drive other tools through their own agent interfaces. Today that is [Overbright](https://github.com/JJ22007/overbright), the author's brightness tool: a scene can set the built-in display's brightness, and Overbright reads the panel back to prove it arrived.
+A scene is a profile that can also drive other tools through their own agent interfaces. Today those are the author's other two tools: [Overbright](https://github.com/JJ22007/overbright) sets the built-in display's brightness and reads the panel back to prove it arrived, and [Paneful](https://github.com/JJ22007/paneful) arranges windows and reads every frame back.
 
 ```bash
 knobs scene                      # list the scenes
@@ -140,9 +140,9 @@ knobs scene present              # switch
 knobs undo                       # put everything back, brightness included
 ```
 
-`present` keeps the display on, hides desktop icons and widgets, auto-hides the Dock, turns off hot corners and lifts the display to 130% with Overbright. One snapshot covers all of it, so one `knobs undo` restores the settings and the brightness. Without Overbright the brightness step is skipped and reported. Do Not Disturb is not part of it: Focus has no setting Knobs can write and read back.
+`present` keeps the display on, hides desktop icons and widgets, auto-hides the Dock, turns off hot corners, and lifts the display to 130% with Overbright. One snapshot covers all of it, so one `knobs undo` restores the settings and the brightness. Without Overbright the brightness step is skipped and reported. [`examples/present-keynote.knobs.json`](examples/present-keynote.knobs.json) adds a window layout: Paneful makes the Keynote window fill the screen, and the same `knobs undo` puts every window back. Do Not Disturb is not part of it: Focus has no setting Knobs can write and read back.
 
-To add brightness to your own profile, add `"overbright": { "percent": 130 }` (0–100 is the backlight, above 100 the boost). Knobs calls `overbright mcp`; it never writes Overbright's files.
+To add brightness to your own profile, add `"overbright": { "percent": 130 }` (0–100 is the backlight, above 100 the boost). Knobs calls `overbright mcp`; it never writes Overbright's files. To arrange windows, add `"paneful": { "layout": [{ "app": "Keynote", "x": 0, "y": 0, "w": 1, "h": 1 }] }` (screen fractions from the top left; each window needs `app` or `title` to pick it, and `display` picks the screen). Knobs calls `paneful mcp` and reports each window's readback; the saved layout stays in the snapshot on this Mac only.
 
 ## Move to a new Mac
 
