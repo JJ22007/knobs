@@ -6,11 +6,15 @@
 
 命令是 `~/.local/bin/knobs`(指向 `~/Applications/Knobs.app` 的链接)。如果不存在,在本仓库运行 `bash build.sh install`。
 
-1. 运行 `knobs list --json`。每一项包含 `id`、`title`、`description`、`accepts`、`value`、`macOSDefault`、`takesEffect`、`customized`;选项类设置还带 `options` 和易读的 `valueLabel`(触发角 `14` 就是“快速备忘录”)。
+1. 运行 `knobs list --json`。每一项包含 `id`、`title`、`description`、`accepts`、`value`、`macOSDefault`、`takesEffect`(`instant`、`newWindows` 或 `relogin`,文字说明在 `takesEffectText`)、`customized`;选项类设置还带 `options` 和易读的 `valueLabel`(触发角 `14` 就是“快速备忘录”)。
 2. 用 `title` 和 `description` 向用户说明你打算改什么。只改用户提到的内容。
-3. `knobs set <id> <值> [<id> <值> ...]`。退出码为 1 表示有项目被拒绝,原因在 stderr。没检查过就不要说成功。
+3. `knobs set <id> <值> [<id> <值> ...] --json`。加 `--dry-run` 先预览。一批修改要么全做要么全不做:有一个值被拒绝,就什么都不写。每一项都会返回 `before`、`after` 和 `verified`(从 macOS 回读确认);被拒绝时 `ok` 为 false,原因在 `errors`。没检查过就不要说成功。
 4. `takesEffect` 不是"立即生效"时要告诉用户(重新打开 App,或注销重新登录)。
-5. `knobs reset <id>` 撤销修改,把设置交还给 macOS。
+5. 每次修改(set、reset、apply,或在窗口里点一下)之前都会先存快照。`knobs undo` 一次撤回一步;`knobs undo --list` 列出每个快照是在什么修改之前存的。`knobs reset <id>` 把单项交还给 macOS。
+
+所有会输出结果的命令都支持 `--json`:`list`、`describe`、`get`、`set`、`reset`、`apply`、`undo`、`status`。
+
+支持 MCP 的客户端可以运行 `knobs mcp`:一个 stdio MCP server,用同一份设置目录和同样带校验的写入。默认只读,用 `knobs mcp --allow-write` 启动才允许修改;预览(dryRun)始终可用。工具有:`list_settings`、`describe_setting`、`get_status`、`list_snapshots`、`set_settings`、`reset_settings`、`apply_profile`、`undo`。
 
 输出语言跟随系统。需要固定语言时加环境变量:`KNOBS_LANG=en` 或 `KNOBS_LANG=zh`。设置的值始终用英文书写(`on`、`off`、数字、选项名)。
 

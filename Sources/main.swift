@@ -53,6 +53,20 @@ func selfTest() -> Int32 {
     let odd = try? Profile.apply(text: #"{"knobs":1,"settings":{"no.such":true,"dock.position":"top"},"files":{"~/.zshrc":"x"}}"#, dryRun: true)
     expect("profile: unknown id, bad value and unlisted file are skipped with a reason", odd?.problems.count == 3 && odd?.changed.isEmpty == true, "\(odd?.problems ?? [])")
 
+    // A profile is shared, so it must never carry the account's home folder or name.
+    let exported = Profile.exportText()
+    expect("profile: no home folder or account name in an export",
+           !exported.contains(NSHomeDirectory()) && !exported.contains("/Users/\(NSUserName())"))
+    let sample = #"{"path": "\#(NSHomeDirectory())/Projects"}"#
+    expect("profile: home folder becomes ~ and comes back", Profile.expandHome(Profile.shortenHome(sample)) == sample
+           && Profile.shortenHome(sample) == #"{"path": "~/Projects"}"#)
+
+    // A batch with one bad value writes nothing. Dry run, so this Mac is untouched either way.
+    let mixed = Changes.run([.init(id: "dock.autohide", value: .string("on")), .init(id: "dock.position", value: .string("top"))], dryRun: true, reason: "test")
+    expect("changes: a refused value is reported", !mixed.ok && mixed.errors.count == 1, "\(mixed.errors)")
+    let unknown = Changes.run([.init(id: "no.such", value: .string("on"))], dryRun: true, reason: "test")
+    expect("changes: an unknown id is refused", !unknown.ok)
+
     print(fails == 0 ? "all checks passed" : "\(fails) check(s) failed")
     return fails == 0 ? 0 : 1
 }

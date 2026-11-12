@@ -8,51 +8,61 @@
 import AppKit
 
 enum CLI {
-    static let commands: Set<String> = ["list", "get", "describe", "set", "reset", "export", "apply", "shortcut", "status", "open", "skill", "presets", "undo", "help", "--help", "-h"]
+    static let commands: Set<String> = ["list", "get", "describe", "set", "reset", "export", "apply", "shortcut", "status", "open", "skill", "presets", "undo", "mcp", "help", "--help", "-h"]
 
     private static let usageEN = """
     knobs: read and change macOS settings from scripts and agents.
 
       knobs list [--json] [--changed] [category]   every setting with its current value
-      knobs describe <id>                          what one setting does, its values, when it takes effect
-      knobs get <id>                               print the current value
-      knobs set <id> <value> [<id> <value> ...]    change settings (on/off, a number, or a choice)
-      knobs reset <id> [<id> ...]                  hand settings back to the macOS default
+      knobs describe <id> [--json]                 what one setting does, its values, when it takes effect
+      knobs get <id> [--json]                      print the current value
+      knobs set <id> <value> [<id> <value> ...] [--dry-run] [--json]
+                                                   change settings (on/off, a number, or a choice)
+      knobs reset <id> [<id> ...] [--dry-run] [--json]
+                                                   hand settings back to the macOS default
       knobs shortcut [<name> <combo|none>]         show or change the Space shortcuts (e.g. spaceLeft ctrl+left)
       knobs export [file]                          write all settings and shortcuts as one profile
-      knobs apply <file|https-url|preset> [--dry-run]
+      knobs apply <file|https-url|preset> [--dry-run] [--json]
                                                    apply a profile; --dry-run only lists the changes
       knobs presets                                ready-made profiles you can apply by name
-      knobs undo [--list]                          put back the settings from before the last apply
-      knobs status                                 is the app running, and are the live features active
+      knobs undo [--list] [--json]                 undo the last change (set, reset, apply or the window)
+      knobs status [--json]                        is the app running, and are the live features active
       knobs open                                   open the Knobs window
       knobs skill [install|remove]                 teach Claude Code about knobs in every folder (a user-level skill)
+      knobs mcp [--allow-write]                    run as an MCP server on stdin/stdout (read-only unless --allow-write)
 
     Categories: \(Category.allCases.map { $0.rawValue }.joined(separator: ", ")).
+    Every change saves a snapshot first; `knobs undo` steps back one change at a time.
     Exit code 0 means everything was applied; 1 means something was refused (the reason is on stderr).
+    With --json the result goes to stdout as one JSON object, errors included.
     """
 
     private static let usageZH = """
     knobs:让脚本和 agent 读取、修改 macOS 设置。
 
       knobs list [--json] [--changed] [分组]      列出所有设置和当前值
-      knobs describe <id>                          某一项是做什么的、可以取哪些值、何时生效
-      knobs get <id>                               输出当前值
-      knobs set <id> <值> [<id> <值> ...]          修改设置(on/off、数字或选项)
-      knobs reset <id> [<id> ...]                  恢复为 macOS 默认
+      knobs describe <id> [--json]                 某一项是做什么的、可以取哪些值、何时生效
+      knobs get <id> [--json]                      输出当前值
+      knobs set <id> <值> [<id> <值> ...] [--dry-run] [--json]
+                                                   修改设置(on/off、数字或选项)
+      knobs reset <id> [<id> ...] [--dry-run] [--json]
+                                                   恢复为 macOS 默认
       knobs shortcut [<名称> <组合键|none>]        查看或修改切换桌面的快捷键(例如 spaceLeft ctrl+left)
       knobs export [文件]                          把所有设置和快捷键导出成一个配置文件
-      knobs apply <文件|https 链接|预设名> [--dry-run]
+      knobs apply <文件|https 链接|预设名> [--dry-run] [--json]
                                                    应用配置文件;--dry-run 只列出会改什么
       knobs presets                                列出可以直接按名字应用的现成配置
-      knobs undo [--list]                          恢复到上一次 apply 之前的设置
-      knobs status                                 应用是否在运行,实时功能是否生效
+      knobs undo [--list] [--json]                 撤销上一次修改(set、reset、apply 或窗口里的改动)
+      knobs status [--json]                        应用是否在运行,实时功能是否生效
       knobs open                                   打开 Knobs 窗口
       knobs skill [install|remove]                 让 Claude Code 在任何文件夹都认识 knobs(用户级 skill)
+      knobs mcp [--allow-write]                    作为 MCP server 运行(stdin/stdout;不加 --allow-write 时只读)
 
     分组:\(Category.allCases.map { $0.rawValue }.joined(separator: ", "))。
     值一律用英文书写:on / off、数字,或 `knobs describe` 里列出的选项。
+    每次修改前都会先存快照;`knobs undo` 一次撤回一步。
     退出码 0 表示全部生效;1 表示有项目被拒绝(原因输出到 stderr)。
+    加 --json 时结果作为一个 JSON 对象输出到 stdout,错误也在里面。
     """
 
     static var usage: String { L(usageEN, usageZH) }
@@ -64,20 +74,23 @@ enum CLI {
             rest.remove(at: i)
             return true
         }
+        let json = flag("--json")
+        let dryRun = flag("--dry-run")
         switch args[0] {
-        case "list": return list(json: flag("--json"), changedOnly: flag("--changed"), category: rest.first)
-        case "describe": return each(rest) { print(describe($0)) }
-        case "get": return each(rest) { print(shown($0)) }
-        case "set": return set(rest)
-        case "reset": return reset(rest)
+        case "list": return list(json: json, changedOnly: flag("--changed"), category: rest.first)
+        case "describe": return json ? eachJSON(rest) { record($0, live: liveStates()) } : each(rest) { print(describe($0)) }
+        case "get": return json ? eachJSON(rest) { ["id": $0.id, "value": Changes.shownValue($0, Engine.current($0)), "customized": Engine.current($0) != nil] } : each(rest) { print(shown($0)) }
+        case "set": return set(rest, dryRun: dryRun, json: json)
+        case "reset": return reset(rest, dryRun: dryRun, json: json)
         case "shortcut": return shortcut(rest)
         case "export": return export(rest.first)
-        case "apply": return apply(dryRun: flag("--dry-run"), path: rest.first)
-        case "status": return status()
+        case "apply": return apply(dryRun: dryRun, path: rest.first, json: json)
+        case "status": return status(json: json)
         case "open": return launchApp(background: false) ? 0 : 1
         case "skill": return skill(rest.first ?? "print")
         case "presets": return presets()
-        case "undo": return undo(list: flag("--list"))
+        case "undo": return undo(list: flag("--list"), json: json)
+        case "mcp": return MCPServer(allowWrite: flag("--allow-write")).run()
         default: print(usage); return 0
         }
     }
@@ -100,9 +113,11 @@ enum CLI {
         `~/.local/bin/knobs` (just `knobs` if ~/.local/bin is on PATH) changes macOS settings safely: every setting has an id, a plain description, its macOS default, and an honest note on when a change takes effect. No sudo, ever.
 
         1. Find the setting: `knobs list --json` (all \(catalog.count)), or `knobs list <category>` for one of: \(Category.allCases.map { $0.rawValue }.joined(separator: ", ")).
-        2. Change only what the user asked for: `knobs set <id> <value> [<id> <value> ...]`. Values are `on`/`off`, a number, or one of the `options` values. Exit code 1 means something was refused; the reason is on stderr.
-        3. Tell the user what changed and when it takes effect (`takesEffect`: instant, apps opened from now on, or after logging out).
-        4. Undo with `knobs reset <id>`.
+        2. Change only what the user asked for: `knobs set <id> <value> [<id> <value> ...] --json`. Values are `on`/`off`, a number, or one of the `options` values. Add `--dry-run` to preview. A batch is all or nothing: if one value is refused, nothing is written. Exit code 1 means something was refused; with `--json` the reasons are in `errors`.
+        3. Each change reports `before`, `after`, `verified` (the value read back from macOS) and `takesEffect` (`instant`, `newWindows` = apps opened from now on, `relogin` = after logging out and back in). Tell the user what changed and anything that is not instant.
+        4. Every change saves a snapshot first. `knobs undo` steps back one change (`knobs undo --list` shows the history); `knobs reset <id>` hands one setting back to the macOS default.
+
+        For MCP clients: `knobs mcp` is a read-only MCP server; `knobs mcp --allow-write` also allows changes.
 
         Whole setup: `knobs export <file>` saves everything (plus the Paneful window manager config); on another Mac, `knobs apply <file> --dry-run` shows the changes and `knobs apply <file>` makes them.
 
@@ -137,6 +152,24 @@ enum CLI {
         return 1
     }
 
+    /// With --json, failures are part of the JSON on stdout, so an agent reads one stream.
+    private static func failJSON(_ text: String) -> Int32 {
+        print(jsonText(["ok": false, "errors": [text]]))
+        return 1
+    }
+
+    private static func eachJSON(_ ids: [String], _ body: (Setting) -> [String: Any]) -> Int32 {
+        guard !ids.isEmpty else { return failJSON(L("give at least one setting id (see `knobs list`)", "请至少给出一个设置 id(用 `knobs list` 查看)")) }
+        var out: [[String: Any]] = []
+        for id in ids {
+            guard let s = catalogByID[id] else { return failJSON(L("unknown setting \"\(id)\" (see `knobs list`)", "不认识的设置“\(id)”(用 `knobs list` 查看)")) }
+            out.append(body(s))
+        }
+        let result: [String: Any] = out.count == 1 ? out[0] : ["settings": out]
+        print(jsonText(result))
+        return 0
+    }
+
     private static func each(_ ids: [String], _ body: (Setting) -> Void) -> Int32 {
         guard !ids.isEmpty else { return fail(L("give at least one setting id (see `knobs list`)", "请至少给出一个设置 id(用 `knobs list` 查看)")) }
         for id in ids {
@@ -148,7 +181,7 @@ enum CLI {
 
     // MARK: Reading
 
-    private static func typeText(_ s: Setting) -> String {
+    static func typeText(_ s: Setting) -> String {
         switch s.kind {
         case .toggle: return "on | off"
         case .number(let min, let max, _, let unit, let integer):
@@ -158,10 +191,10 @@ enum CLI {
         }
     }
 
-    private static func record(_ s: Setting, live: [String: Any]) -> [String: Any] {
+    static func record(_ s: Setting, live: [String: Any]) -> [String: Any] {
         var r: [String: Any] = [
             "id": s.id, "category": s.category.rawValue, "title": s.title, "description": s.detail,
-            "accepts": typeText(s), "takesEffect": s.timing.label, "backedBy": s.keyDescription,
+            "accepts": typeText(s), "takesEffect": s.timing.rawValue, "takesEffectText": s.timing.label, "backedBy": s.keyDescription,
             "customized": Engine.current(s) != nil,
         ]
         if case .live = s.backing { r["customized"] = Engine.current(s) == .bool(true) }
@@ -188,7 +221,7 @@ enum CLI {
         return choiceLabel(s, v).map { "\(v) (\($0))" } ?? "\(v)"
     }
 
-    private static func liveStates() -> [String: Any] {
+    static func liveStates() -> [String: Any] {
         guard appIsRunning(), let data = FileManager.default.contents(atPath: ConfigStore.statusPath),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
         return obj["live"] as? [String: Any] ?? [:]
@@ -219,7 +252,7 @@ enum CLI {
         return 0
     }
 
-    private static func describe(_ s: Setting) -> String {
+    static func describe(_ s: Setting) -> String {
         var lines = ["\(s.id): \(s.title)", "  \(s.detail)",
                      "  \(L("value now:   ", "当前值:  ")) \(shown(s, fallback: L("macOS default", "macOS 默认")))\(Engine.current(s) == nil ? L(" (never changed)", "(从未改过)") : "")",
                      "  \(L("accepts:     ", "可接受:  ")) \(typeText(s))"]
@@ -231,35 +264,44 @@ enum CLI {
 
     // MARK: Writing
 
-    private static func set(_ args: [String]) -> Int32 {
-        guard !args.isEmpty, args.count % 2 == 0 else { return fail(L("usage: knobs set <id> <value> [<id> <value> ...]", "用法:knobs set <id> <值> [<id> <值> ...]")) }
-        var restart = Set<String>()
-        var liveIDs: [String] = []
-        var code: Int32 = 0
-        for i in stride(from: 0, to: args.count, by: 2) {
-            guard let s = catalogByID[args[i]] else { code = fail(L("unknown setting \"\(args[i])\" (see `knobs list`)", "不认识的设置“\(args[i])”(用 `knobs list` 查看)")); continue }
-            do {
-                restart.formUnion(try Engine.set(s, .string(args[i + 1])))
-                if case .live = s.backing { liveIDs.append(s.id) }
-                else { print("\(s.id) = \(shown(s))\(s.timing == .instant ? "" : "  (\(s.timing.label))")") }
-            } catch { code = fail("\(error)") }
+    private static func set(_ args: [String], dryRun: Bool, json: Bool) -> Int32 {
+        guard !args.isEmpty, args.count % 2 == 0 else {
+            let usage = L("usage: knobs set <id> <value> [<id> <value> ...] [--dry-run] [--json]", "用法:knobs set <id> <值> [<id> <值> ...] [--dry-run] [--json]")
+            return json ? failJSON(usage) : fail(usage)
         }
-        Prefs.restart(restart)
-        notifyApp()
-        return max(code, reportLive(liveIDs))
+        let requests = stride(from: 0, to: args.count, by: 2).map { Changes.Request(id: args[$0], value: .string(args[$0 + 1])) }
+        return write(requests, dryRun: dryRun, json: json, reason: "knobs set " + args.joined(separator: " "))
     }
 
-    private static func reset(_ ids: [String]) -> Int32 {
-        var restart = Set<String>()
-        var liveIDs: [String] = []
-        let code = each(ids) { s in
-            restart.formUnion(Engine.reset(s))
-            if case .live = s.backing { liveIDs.append(s.id) }
-            else { print("\(s.id) = \(shown(s, fallback: L("macOS default", "macOS 默认")))  \(L("(back to the macOS default)", "(已恢复为 macOS 默认)"))") }
+    private static func reset(_ ids: [String], dryRun: Bool, json: Bool) -> Int32 {
+        guard !ids.isEmpty else {
+            let usage = L("give at least one setting id (see `knobs list`)", "请至少给出一个设置 id(用 `knobs list` 查看)")
+            return json ? failJSON(usage) : fail(usage)
         }
-        Prefs.restart(restart)
-        notifyApp()
-        return max(code, reportLive(liveIDs))
+        return write(ids.map { Changes.Request(id: $0, value: nil) }, dryRun: dryRun, json: json, reason: "knobs reset " + ids.joined(separator: " "))
+    }
+
+    /// set and reset: one snapshot, then write, read back and report.
+    private static func write(_ requests: [Changes.Request], dryRun: Bool, json: Bool, reason: String) -> Int32 {
+        var out = Changes.run(requests, dryRun: dryRun, reason: reason)
+        if !dryRun { Changes.confirmLive(&out) }
+        if json {
+            print(jsonText(out.json))
+            return out.ok ? 0 : 1
+        }
+        for item in out.items {
+            guard let id = item["id"] as? String, let s = catalogByID[id], item["error"] == nil else { continue }
+            let after = Value(any: item["after"]).map { v in choiceLabel(s, v).map { "\(v) (\($0))" } ?? "\(v)" } ?? L("macOS default", "macOS 默认")
+            var line = "\(id) = \(after)"
+            if dryRun { line = L("would set ", "将会设为 ") + line + ((item["changed"] as? Bool) == false ? L("  (already so)", "(本来就是)") : "") }
+            else if item["reset"] != nil { line += "  " + L("(back to the macOS default)", "(已恢复为 macOS 默认)") }
+            else if case .live = s.backing { line += "  (\(item["verified"] as? Bool == true ? L(item["active"] as? Bool == true ? "active now" : "stopped", item["active"] as? Bool == true ? "已生效" : "已停止") : L("not confirmed", "未确认")))" }
+            else if s.timing != .instant { line += "  (\(s.timing.label))" }
+            print(line)
+        }
+        out.errors.forEach { _ = fail($0) }
+        if out.snapshot != nil { print(L("Changed your mind? `knobs undo` puts it back.", "后悔了?运行 `knobs undo` 即可撤回。")) }
+        return out.ok ? 0 : 1
     }
 
     private static func shortcut(_ args: [String]) -> Int32 {
@@ -291,22 +333,31 @@ enum CLI {
         return 0
     }
 
-    private static func apply(dryRun: Bool, path: String?) -> Int32 {
-        guard let path else { return fail(L("usage: knobs apply <file|https-url|preset> [--dry-run]", "用法:knobs apply <文件|https 链接|预设名> [--dry-run]")) }
+    private static func apply(dryRun: Bool, path: String?, json: Bool) -> Int32 {
+        let complain: (String) -> Int32 = json ? failJSON : fail
+        guard let path else { return complain(L("usage: knobs apply <file|https-url|preset> [--dry-run] [--json]", "用法:knobs apply <文件|https 链接|预设名> [--dry-run] [--json]")) }
         let text: String
         switch loadProfile(path) {
         case .success(let t): text = t
-        case .failure(let e): return fail(e.description)
+        case .failure(let e): return complain(e.description)
+        }
+        if json {
+            do {
+                let report = try Profile.apply(text: text, dryRun: dryRun, reason: "knobs apply \(path)")
+                if !dryRun { notifyApp() }
+                print(jsonText(report.json(dryRun: dryRun)))
+                return report.problems.isEmpty ? 0 : 1
+            } catch { return failJSON("\(error)") }
         }
         do {
-            let report = try Profile.apply(text: text, dryRun: dryRun)
+            let report = try Profile.apply(text: text, dryRun: dryRun, reason: "knobs apply \(path)")
             report.changed.forEach { print(L("\(dryRun ? "would change" : "changed") \($0)", "\(dryRun ? "将会更改" : "已更改") \($0)")) }
             print(L("\(report.changed.count) \(dryRun ? "to change" : "changed"), \(report.unchanged) already matched.", "\(dryRun ? "将更改" : "已更改") \(report.changed.count) 项,\(report.unchanged) 项本来就一致。"))
             report.problems.forEach { _ = fail($0) }
             if !dryRun { notifyApp() }
             if !dryRun, !report.changed.isEmpty { print(L("Changed your mind? `knobs undo` puts everything back.", "后悔了?运行 `knobs undo` 即可全部恢复。")) }
             let liveIDs = dryRun ? [] : catalog.filter { if case .live = $0.backing { return Engine.current($0) == .bool(true) }; return false }.map { $0.id }
-            return max(report.problems.isEmpty ? 0 : 1, reportLive(liveIDs))
+            return max(report.problems.isEmpty ? 0 : 1, printLive(liveIDs))
         } catch { return fail("\(error)") }
     }
 
@@ -349,25 +400,30 @@ enum CLI {
                                      "找不到名为“\(source)”的文件、链接或预设。可用预设:\(presetNames().joined(separator: ", "))")))
     }
 
-    private static func undo(list: Bool) -> Int32 {
+    private static func undo(list: Bool, json: Bool) -> Int32 {
         let all = Profile.backups()
         if list {
-            if all.isEmpty { print(L("No snapshots yet. One is saved every time a profile is applied.", "还没有快照。每次应用配置前都会自动存一份。")) }
-            all.forEach { print($0) }
+            if json {
+                print(jsonText(["snapshots": all.map { ["path": tildePath($0), "before": Profile.reason(ofSnapshot: $0)] }]))
+                return 0
+            }
+            if all.isEmpty { print(L("No snapshots yet. One is saved before every change.", "还没有快照。每次修改前都会自动存一份。")) }
+            for path in all {
+                print("\((path as NSString).lastPathComponent)  \(L("before", "之前:")) \(Profile.reason(ofSnapshot: path))")
+            }
             return 0
         }
-        guard let latest = all.first, let text = try? String(contentsOfFile: latest, encoding: .utf8) else {
-            return fail(L("nothing to undo: no profile has been applied yet", "没有可撤销的:还没有应用过配置"))
+        let result = Changes.undo()
+        if json {
+            print(jsonText(result.json))
+            return result.error == nil && result.report.problems.isEmpty ? 0 : 1
         }
-        do {
-            let report = try Profile.apply(text: text, dryRun: false, snapshot: false)
-            report.changed.forEach { print(L("restored \($0)", "已恢复 \($0)")) }
-            print(L("\(report.changed.count) restored from \(latest)", "已从 \(latest) 恢复 \(report.changed.count) 项"))
-            try? FileManager.default.removeItem(atPath: latest)
-            report.problems.forEach { _ = fail($0) }
-            notifyApp()
-            return report.problems.isEmpty ? 0 : 1
-        } catch { return fail("\(error)") }
+        if let error = result.error { return fail(error) }
+        result.report.changed.forEach { print(L("restored \($0)", "已恢复 \($0)")) }
+        print(L("Undid \"\(result.reason)\": \(result.report.changed.count) restored. \(Profile.backups().count) older snapshots left.",
+                "已撤销“\(result.reason)”:恢复了 \(result.report.changed.count) 项。还剩 \(Profile.backups().count) 个更早的快照。"))
+        result.report.problems.forEach { _ = fail($0) }
+        return result.report.problems.isEmpty ? 0 : 1
     }
 
     private static func presets() -> Int32 {
@@ -385,11 +441,11 @@ enum CLI {
     // MARK: Talking to the app
 
     /// Lets an open Knobs window redraw at once after a change made from the command line.
-    private static func notifyApp() {
+    static func notifyApp() {
         DistributedNotificationCenter.default().postNotificationName(ConfigStore.changed, object: nil, userInfo: nil, deliverImmediately: true)
     }
 
-    private static func appIsRunning() -> Bool {
+    static func appIsRunning() -> Bool {
         !NSRunningApplication.runningApplications(withBundleIdentifier: "io.github.knobs").isEmpty
     }
 
@@ -405,6 +461,9 @@ enum CLI {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/open")
         p.arguments = background ? ["-g", "-a", path, "--args", "--background"] : ["-a", path]
+        // Never write to stdout here: in `knobs mcp` stdout carries the protocol.
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
         try? p.run()
         p.waitUntilExit()
         return p.terminationStatus == 0
@@ -414,30 +473,51 @@ enum CLI {
         (try? FileManager.default.attributesOfItem(atPath: ConfigStore.statusPath)[.modificationDate] as? Date) ?? .distantPast
     }
 
-    /// After changing live settings: make sure the app is up, wait for it to act, and say what happened.
-    private static func reportLive(_ ids: [String]) -> Int32 {
+    /// Waits for the app, then prints whether each live feature really is in the state asked for.
+    private static func printLive(_ ids: [String]) -> Int32 {
         guard !ids.isEmpty else { return 0 }
+        var out = Changes.Outcome()
+        out.liveIDs = ids
+        out.items = ids.map { ["id": $0] }
+        Changes.confirmLive(&out)
+        for item in out.items where item["verified"] as? Bool == true {
+            let active = item["active"] as? Bool == true
+            print("\(item["id"] ?? "") = \(active ? "on" : "off")  (\(L(active ? "active now" : "stopped", active ? "已生效" : "已停止")))")
+        }
+        out.errors.forEach { _ = fail($0) }
+        return out.ok ? 0 : 1
+    }
+
+    /// After changing live settings: make sure the app is up and wait for it to act.
+    /// Returns the live states it reports, or nil if the app could not be started.
+    static func waitForLive(_ ids: [String]) -> [String: Any]? {
+        guard !ids.isEmpty else { return [:] }
         let asked = Date().addingTimeInterval(-1.5)
-        if !appIsRunning(), !launchApp(background: true) { return 1 }
+        if !appIsRunning(), !launchApp(background: true) { return nil }
         let deadline = Date().addingTimeInterval(6)
         while Date() < deadline, !(appIsRunning() && statusDate() > asked) { usleep(50_000) }
         usleep(150_000)
-        let live = liveStates()
-        var code: Int32 = 0
-        for id in ids {
-            guard let s = catalogByID[id] else { continue }
-            let wanted = Engine.current(s) == .bool(true)
-            let state = live[id] as? [String: Any]
-            let active = state?["active"] as? Bool ?? false
-            let note = state?["note"] as? String ?? ""
-            if state == nil { code = fail(L("\(id): the Knobs app did not answer", "\(id):Knobs 应用没有响应")) }
-            else if wanted == active { print(L("\(id) = \(wanted ? "on" : "off")  (\(wanted ? "active now" : "stopped"))", "\(id) = \(wanted ? "on" : "off")  (\(wanted ? "已生效" : "已停止"))")) }
-            else { code = fail(L("\(id) is set to \(wanted ? "on" : "off") but is \(active ? "still active" : "not active yet")\(note.isEmpty ? "" : ": " + note)", "\(id) 已设为 \(wanted ? "on" : "off"),但\(active ? "仍在生效" : "还没有生效")\(note.isEmpty ? "" : ":" + note)")) }
-        }
-        return code
+        return liveStates()
     }
 
-    private static func status() -> Int32 {
+    static func statusJSON() -> [String: Any] {
+        guard appIsRunning() else { return ["appRunning": false, "live": [:]] }
+        let data = FileManager.default.contents(atPath: ConfigStore.statusPath) ?? Data()
+        let obj = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+        var live: [String: Any] = [:]
+        for s in catalog {
+            guard case .live = s.backing else { continue }
+            let state = (obj["live"] as? [String: Any])?[s.id] as? [String: Any]
+            var entry: [String: Any] = ["wanted": Engine.current(s) == .bool(true), "active": state?["active"] as? Bool ?? false]
+            if let note = state?["note"] as? String, !note.isEmpty { entry["note"] = note }
+            live[s.id] = entry
+        }
+        return ["appRunning": true, "accessibility": obj["accessibility"] as? Bool ?? false, "live": live,
+                "snapshots": Profile.backups().count]
+    }
+
+    private static func status(json: Bool) -> Int32 {
+        if json { print(jsonText(statusJSON())); return 0 }
         guard appIsRunning() else { print(L("Knobs app: not running (live features are off until it starts; `knobs open`)", "Knobs 应用:未运行(启动前实时功能不生效;可运行 `knobs open`)")); return 0 }
         let data = FileManager.default.contents(atPath: ConfigStore.statusPath) ?? Data()
         let obj = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]

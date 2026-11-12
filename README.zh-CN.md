@@ -18,9 +18,9 @@ Knobs 是一个 `knobs` 命令,外加一个菜单栏小应用和设置窗口。�
 
 agent 自己就会跑 `defaults write`。问题出在之后:它记得的键可能早就失效了;写进去 macOS 接没接受,它不知道;要不要重启程序坞、要不要注销,它也不知道;改错了没法撤销。Knobs 就是回答这四个问题的那一层。
 
-- **带类型的设置目录。** `knobs list --json` 给出每一项的 id、含义、合法取值、当前值、macOS 默认值和生效时机。
+- **带类型的设置目录,也能通过 MCP 用。** `knobs list --json` 给出每一项的 id、含义、合法取值、当前值、macOS 默认值和生效时机。`knobs mcp` 把同样的内容提供给 MCP 客户端,默认只读,允许后才能修改。
 - **写入有校验。** `knobs set` 拒绝不合法的值,写完回读;macOS 没接受就以退出码 1 结束,原因写在 stderr。只有值真的变了才重启程序坞或访达。
-- **能撤销。** 每次 `knobs apply` 前先存快照,`knobs undo` 把所有设置恢复原样,原本没改过的也会交还给 macOS。单条 `knobs set` 目前还不存快照,可以用 `knobs reset <id>` 把单项交还给 macOS。
+- **能撤销。** 每次修改(`set`、`reset`、`apply`,或在窗口里点一下)之前都先存快照,`knobs undo` 一次撤回一步,原本没改过的也会交还给 macOS。
 - **看得懂,带得走。** 112 项设置,分成 13 组,每一项都有背后真实的偏好设置键。`knobs export` 导出一个 JSON 文件,可以从文件、链接或预设套用到另一台 Mac。
 
 顺带包含的功能(只是方便,不是选 Knobs 的理由):
@@ -36,11 +36,11 @@ agent 自己就会跑 `defaults write`。问题出在之后:它记得的键可�
 | 设置数量 | 比 Knobs 多 | 80+(README) | 程序坞、访达、全局设置,以及多得多的东西 | 112 |
 | agent 能列出、校验、修改设置 | 不能 | 不能 | 要改 Nix 文件 | `knobs list --json`、`knobs set`、退出码 |
 | 标注每项什么时候生效 | 部分设置有 | 需要时自动重启程序坞或访达 | 重新构建后 | 每一项都标:立即、之后打开的 App、注销后 |
-| 撤销 | 恢复到原始状态 | 每次修改前存快照 | 回滚到上一代 | 每次 `apply` 前存快照,`set` 还不存 |
+| 撤销 | 恢复到原始状态 | 每次修改前存快照 | 回滚到上一代 | 每次修改前存快照,`knobs undo` 一步步撤回 |
 | 分享一套设置 | 不支持 | 导出导入配置文件 | 分享 flake | 一个 JSON 文件、一个链接或一个预设 |
 | 安装 | 签名安装包 | DMG 下载 | Nix | 用 Command Line Tools 从源码编译,还没有签名安装包 |
 
-Knobs 更差的地方:设置比 TinkerTool 少,还没有签名安装包和 Homebrew cask,PowerChest 单条修改也存快照。Knobs 也不是要取代完整的 dotfiles 或 Nix 配置。
+Knobs 更差的地方:设置比 TinkerTool 少,还没有签名安装包和 Homebrew cask,PowerChest 和 [Mainspring](https://trymainspring.com) 对完全不用终端的人来说更完整好用。Knobs 也不是要取代完整的 dotfiles 或 Nix 配置。
 
 **为什么不直接用 `defaults write`、nix-darwin、TinkerTool 或 PowerChest?** 合适就用它们。Knobs 要替代的,正是 agent 凭记忆写 `defaults write`;nix-darwin 管得多得多,但要学 Nix、要重新构建;TinkerTool 和 PowerChest 是好用的图形工具,但没有 agent 能调用的接口。当你想让 agent 改 Mac 设置,同时清楚它改了什么、改成没有、怎么撤回,就用 Knobs。
 
@@ -101,14 +101,26 @@ knobs describe dock.autohide   # 查看某一项的详细说明
 knobs set dock.autohide on dock.autohideDelay 0
 knobs reset dock.autohideDelay # 交还给 macOS 默认值
 knobs set spaces.instant on    # 会报告是否真的生效,没生效会说明原因
+knobs set dock.size 48 --dry-run --json   # 预览;--json 会给出修改前后的值、是否回读确认、何时生效
+knobs undo                     # 撤回一步;knobs undo --list 查看历史
 knobs status
 ```
+
+不管是用 `knobs`、让 agent 改,还是在窗口里点一下,每次修改前都会先存快照,所以 `knobs undo`(或窗口里的“撤销”,⌘Z)可以一步一步往回撤。一批修改要么全做要么全不做:有一个值被拒绝,就什么都不写。
+
+支持 MCP 的客户端(Claude Desktop、Cursor 等)可以用 `knobs mcp`,它是一个 stdio MCP server,工具和命令行一致。默认只读,用 `knobs mcp --allow-write` 启动才允许修改:
+
+```json
+{ "mcpServers": { "knobs": { "command": "~/.local/bin/knobs", "args": ["mcp", "--allow-write"] } } }
+```
+
+有些客户端不会展开 `~`,那里请写 `knobs` 的完整路径。
 
 可以这样对 agent 说:
 
 > 用 `knobs` 命令看一下我的 macOS 设置(`knobs list --json`)。我想让一切更快:去掉不必要的动画,桌面空间切换不带动画。每改一项之前先告诉我它是做什么的。
 
-窗口里的"Agent 提示词"按钮可以直接复制一段现成的提示词。全部成功时退出码为 0;有任何一项被拒绝时为 1,原因写在 stderr,agent 能据此判断。
+窗口里的"Agent 提示词"按钮可以直接复制一段现成的提示词。全部成功时退出码为 0;有任何一项被拒绝时为 1,原因写在 stderr(加 `--json` 时在 `errors` 里),agent 能据此判断。
 
 ## 换新电脑
 

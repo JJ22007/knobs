@@ -24,9 +24,9 @@ Knobs is a `knobs` command plus a small menu bar app and settings window. It col
 
 An agent can already run `defaults write` on its own. The trouble is what happens next: the key it remembers may be years out of date, it cannot tell whether macOS accepted the value, it does not know whether the Dock needs a restart or the user needs to log out, and there is no undo. Knobs is the layer that answers those four questions.
 
-- **Typed catalog.** `knobs list --json` gives every setting's id, meaning, accepted values, current value, macOS default and when it takes effect.
+- **Typed catalog, also over MCP.** `knobs list --json` gives every setting's id, meaning, accepted values, current value, macOS default and when it takes effect. `knobs mcp` offers the same to MCP clients, read-only unless you allow writes.
 - **Checked writes.** `knobs set` rejects values outside the accepted range, reads the value back after writing, and exits 1 with the reason on stderr when macOS did not take it. It restarts the Dock or Finder only when a value actually changed.
-- **Undo.** Every `knobs apply` saves a snapshot first, and `knobs undo` puts every setting back, including handing untouched ones back to macOS. A single `knobs set` does not save a snapshot yet; `knobs reset <id>` hands one setting back to macOS.
+- **Undo.** Every change (`set`, `reset`, `apply`, or a click in the window) saves a snapshot first, and `knobs undo` steps back one change, including handing untouched settings back to macOS.
 - **Readable and portable.** 112 settings in 13 groups, each with the exact preference key behind it. `knobs export` writes one JSON file you can apply on another Mac, from a file, a link or a preset.
 
 Also included, as conveniences rather than the reason to use Knobs:
@@ -42,11 +42,11 @@ Also included, as conveniences rather than the reason to use Knobs:
 | Number of settings | more than Knobs | 80+ (README) | Dock, Finder, global defaults and much more | 112 |
 | An agent can list, validate and change settings | no | no | by editing Nix files | `knobs list --json`, `knobs set`, exit codes |
 | Says when each change takes effect | for some settings | restarts the Dock or Finder when needed | after a rebuild | every setting: now, apps opened later, or after logout |
-| Undo | restore the original state | snapshot before every change | roll back a generation | snapshot before every `apply`, not yet for `set` |
+| Undo | restore the original state | snapshot before every change | roll back a generation | snapshot before every change; `knobs undo` steps back one at a time |
 | Share a setup | no | export and import a profile | share the flake | one JSON file, a link or a preset |
 | Install | signed download | DMG download | Nix | build from source with the Command Line Tools; no signed download yet |
 
-Where Knobs is worse: fewer settings than TinkerTool, no signed download or Homebrew cask yet, and PowerChest also snapshots single changes. Knobs is not a replacement for a full dotfiles or Nix setup.
+Where Knobs is worse: fewer settings than TinkerTool, no signed download or Homebrew cask yet, and PowerChest and [Mainspring](https://trymainspring.com) are more polished apps for people who never open a terminal. Knobs is not a replacement for a full dotfiles or Nix setup.
 
 **Why not just `defaults write`, nix-darwin, TinkerTool or PowerChest?** Use them if they fit. `defaults write` from memory is what Knobs is meant to replace for agents; nix-darwin manages far more but needs Nix and a rebuild; TinkerTool and PowerChest are good GUIs with no interface an agent can call. Knobs is for when you want an agent to change your Mac's settings and still know what it changed, whether it worked, and how to undo it.
 
@@ -107,14 +107,26 @@ knobs describe dock.autohide   # one setting in detail
 knobs set dock.autohide on dock.autohideDelay 0
 knobs reset dock.autohideDelay # hand it back to the macOS default
 knobs set spaces.instant on    # reports whether it is really active, and why not if it is not
+knobs set dock.size 48 --dry-run --json   # preview; --json gives before, after, verified, takesEffect
+knobs undo                     # step back one change; knobs undo --list shows the history
 knobs status
 ```
+
+Every change, whether it comes from `knobs`, an agent or a click in the window, saves a snapshot first, so `knobs undo` (or Undo in the window, ⌘Z) steps back one change at a time. A batch is all or nothing: if one value is refused, nothing is written.
+
+For MCP clients (Claude Desktop, Cursor and others), `knobs mcp` is a stdio MCP server with the same tools. It is read-only unless you start it as `knobs mcp --allow-write`:
+
+```json
+{ "mcpServers": { "knobs": { "command": "~/.local/bin/knobs", "args": ["mcp", "--allow-write"] } } }
+```
+
+Some clients do not expand `~`; use the full path to `knobs` there.
 
 Tell your agent something like:
 
 > Use the `knobs` command to look at my macOS settings (`knobs list --json`). I want everything to feel faster: no animations I don't need, and Spaces that switch instantly. Explain each change before you make it.
 
-The "Agent prompt" button in the window copies a ready-made version. The exit code is 0 when everything applied and 1 when something was refused, with the reason on stderr, so an agent can tell.
+The "Agent prompt" button in the window copies a ready-made version. The exit code is 0 when everything applied and 1 when something was refused, with the reason on stderr (or in `errors` with `--json`), so an agent can tell.
 
 ## Move to a new Mac
 

@@ -207,7 +207,7 @@ enum Profile {
         }
         var files: [String: String] = [:]
         for path in companionFiles {
-            if let text = try? String(contentsOfFile: expandTilde(path), encoding: .utf8) { files[path] = text }
+            if let text = try? String(contentsOfFile: expandTilde(path), encoding: .utf8) { files[path] = shortenHome(text) }
         }
         let iso = ISO8601DateFormatter()
         return [
@@ -227,15 +227,25 @@ enum Profile {
         ]
     }
 
-    // MARK: Snapshots, so a profile can be undone
+    /// A profile is meant to be shared, so it never carries the account name: paths inside
+    /// companion files are written as ~/… and expanded again on the Mac that applies them.
+    static func shortenHome(_ text: String) -> String {
+        text.replacingOccurrences(of: "\"" + NSHomeDirectory() + "/", with: "\"~/")
+    }
+    static func expandHome(_ text: String) -> String {
+        text.replacingOccurrences(of: "\"~/", with: "\"" + NSHomeDirectory() + "/")
+    }
+
+    // MARK: Snapshots, so any change can be undone
 
     static var backupDirectory: String { expandTilde("~/.config/knobs/backups") }
 
     /// Everything as it is now, including which settings are untouched, so applying the
     /// snapshot later puts the Mac back exactly (settings a profile turned on get reset).
-    static func snapshot() -> [String: Any] {
+    static func snapshot(reason: String) -> [String: Any] {
         var obj = export()
-        obj["about"] = "A Knobs snapshot taken automatically before a profile was applied. `knobs undo` restores it."
+        obj["about"] = "A Knobs snapshot taken automatically before a change. `knobs undo` restores it."
+        obj["reason"] = reason
         obj["reset"] = catalog.filter { s in
             if case .live = s.backing { return Engine.current(s) != .bool(true) }
             return Engine.current(s) == nil
@@ -243,17 +253,31 @@ enum Profile {
         return obj
     }
 
-    /// Saves a snapshot and keeps the newest 20. Returns its path.
+    /// How many snapshots are kept. Every change from the window, the command line or an agent
+    /// saves one, so this is the depth of `knobs undo`.
+    static let snapshotLimit = 50
+
+    /// Saves a snapshot and keeps the newest `snapshotLimit`. Returns its path.
     @discardableResult
-    static func saveSnapshot() -> String? {
+    static func saveSnapshot(reason: String) -> String? {
         let fm = FileManager.default
         try? fm.createDirectory(atPath: backupDirectory, withIntermediateDirectories: true)
-        let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        // Milliseconds keep two changes in the same second apart and in order.
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let stamp = f.string(from: Date()).replacingOccurrences(of: ":", with: "-")
         let path = backupDirectory + "/\(stamp).knobs.json"
-        guard let data = try? JSONSerialization.data(withJSONObject: snapshot(), options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
+        guard let data = try? JSONSerialization.data(withJSONObject: snapshot(reason: reason), options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
               fm.createFile(atPath: path, contents: data) else { return nil }
-        for old in backups().dropFirst(20) { try? fm.removeItem(atPath: old) }
+        for old in backups().dropFirst(snapshotLimit) { try? fm.removeItem(atPath: old) }
         return path
+    }
+
+    /// What a snapshot was taken before ("knobs set dock.autohide on"), for `knobs undo --list`.
+    static func reason(ofSnapshot path: String) -> String {
+        guard let data = FileManager.default.contents(atPath: path),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return "" }
+        return obj["reason"] as? String ?? L("applying a profile", "应用配置文件")
     }
 
     /// Snapshot paths, newest first.
@@ -271,10 +295,22 @@ enum Profile {
         var changed: [String] = []
         var unchanged = 0
         var problems: [String] = []
+        /// The same changes, structured for --json and MCP: kind, id, before, after.
+        var details: [[String: Any]] = []
+        var snapshot: String?
+
+        mutating func note(_ kind: String, _ id: String, _ before: Any?, _ after: Any?) {
+            details.append(["kind": kind, "id": id, "before": before ?? NSNull(), "after": after ?? NSNull()])
+        }
+
+        func json(dryRun: Bool) -> [String: Any] {
+            ["ok": problems.isEmpty, "dryRun": dryRun, "changes": details, "unchanged": unchanged,
+             "errors": problems, "snapshot": snapshot.map(tildePath) ?? NSNull()]
+        }
     }
 
     /// Apply a profile. With `dryRun` nothing is written and the report says what would change.
-    static func apply(text: String, dryRun: Bool, snapshot: Bool = true) throws -> Report {
+    static func apply(text: String, dryRun: Bool, snapshot: Bool = true, reason: String = "knobs apply") throws -> Report {
         guard let obj = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any] else {
             throw KnobsError(L("not a JSON object", "不是有效的 JSON 文件"))
         }
@@ -282,10 +318,10 @@ enum Profile {
             throw KnobsError(L("not a Knobs profile (missing \"knobs\" or \"settings\")", "不是 Knobs 配置文件(缺少 knobs 或 settings 字段)"))
         }
         // Before changing anything, remember how things were so `knobs undo` can put them back.
-        if !dryRun, snapshot, let preview = try? apply(text: text, dryRun: true), !preview.changed.isEmpty {
-            saveSnapshot()
-        }
         var report = Report()
+        if !dryRun, snapshot, let preview = try? apply(text: text, dryRun: true), !preview.changed.isEmpty {
+            report.snapshot = saveSnapshot(reason: reason)
+        }
         var restart = Set<String>()
 
         // A snapshot lists the settings that were untouched; hand those back to macOS.
@@ -295,6 +331,7 @@ enum Profile {
             let isOn: Bool = { if case .live = s.backing { return now == .bool(true) }; return now != nil }()
             guard isOn else { continue }
             report.changed.append("\(id): \(now.map { "\($0)" } ?? "") → \(L("macOS default", "macOS 默认"))")
+            report.note("setting", id, now?.any, s.systemDefault?.any)
             if !dryRun { restart.formUnion(Engine.reset(s)) }
         }
 
@@ -307,6 +344,7 @@ enum Profile {
             // An unset key that already behaves as wanted is left unset.
             if now == wanted || (now == nil && s.systemDefault == wanted) { report.unchanged += 1; continue }
             report.changed.append("\(id): \((now ?? s.systemDefault).map { "\($0)" } ?? L("system default", "系统默认")) → \(wanted)")
+            report.note("setting", id, (now ?? s.systemDefault)?.any, wanted.any)
             if dryRun { continue }
             do { restart.formUnion(try Engine.set(s, wanted)) }
             catch { report.problems.append("\(error)") }
@@ -319,19 +357,22 @@ enum Profile {
                 let combo = shortcuts[name] ?? ""
                 guard combo.isEmpty || KeyCombo.parse(combo) != nil else { report.problems.append(L("shortcut \(name): cannot read \"\(combo)\", skipped", "快捷键 \(name):无法识别“\(combo)”,已跳过")); continue }
                 report.changed.append(L("shortcut \(name): \(now[name] ?? "none") → \(combo.isEmpty ? "none" : combo)", "快捷键 \(name):\(now[name] ?? "none") → \(combo.isEmpty ? "none" : combo)"))
+                report.note("shortcut", name, now[name] ?? "none", combo.isEmpty ? "none" : combo)
                 if !dryRun { ConfigStore.update { $0.shortcuts[name] = combo } }
             }
         }
 
         if let files = obj["files"] as? [String: String] {
             for path in files.keys.sorted() {
-                guard companionFiles.contains(path), let wanted = files[path] else {
+                guard companionFiles.contains(path), let shared = files[path] else {
                     report.problems.append(L("file \(path): not on the list of files a profile may write, skipped", "文件 \(path):不在配置文件允许写入的清单里,已跳过")); continue
                 }
+                let wanted = expandHome(shared)
                 let full = expandTilde(path)
                 let existing = try? String(contentsOfFile: full, encoding: .utf8)
                 if existing == wanted { report.unchanged += 1; continue }
                 report.changed.append(L("file \(path): \(existing == nil ? "created" : "replaced (old copy kept as .bak)")", "文件 \(path):\(existing == nil ? "新建" : "已替换(旧文件保留为 .bak)")"))
+                report.note("file", path, existing == nil ? nil : "existing file", "file from the profile")
                 if dryRun { continue }
                 try? FileManager.default.createDirectory(atPath: (full as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
                 if let existing { try? existing.write(toFile: full + ".bak", atomically: true, encoding: .utf8) }

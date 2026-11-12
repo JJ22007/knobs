@@ -6,15 +6,19 @@ Instructions for AI agents. There are two kinds of work here: using Knobs on som
 
 The command is `~/.local/bin/knobs` (a link into `~/Applications/Knobs.app`). If it is missing, run `bash build.sh install` in this repository.
 
-1. Run `knobs list --json`. Each entry has `id`, `title`, `description`, `accepts`, `value`, `macOSDefault`, `takesEffect` and `customized`; choices also carry `options` and a readable `valueLabel` (hot corner `14` is "Quick Note").
+1. Run `knobs list --json`. Each entry has `id`, `title`, `description`, `accepts`, `value`, `macOSDefault`, `takesEffect` (`instant`, `newWindows` or `relogin`, with `takesEffectText` in words) and `customized`; choices also carry `options` and a readable `valueLabel` (hot corner `14` is "Quick Note").
 2. Explain what you intend to change in the user's words, using `title` and `description`. Only change what they asked for.
-3. `knobs set <id> <value> [<id> <value> ...]`. Exit code 1 means something was refused; the reason is on stderr. Do not report success without checking it.
+3. `knobs set <id> <value> [<id> <value> ...] --json`. Add `--dry-run` to preview. A batch is all or nothing: one refused value means nothing is written. Each change comes back with `before`, `after` and `verified` (read back from macOS); `ok` is false and `errors` says why when something was refused. Do not report success without checking it.
 4. Tell the user about `takesEffect` when it is not instant (reopen the app, or log out and back in).
-5. `knobs reset <id>` undoes a change by handing the setting back to macOS.
+5. Every change (set, reset, apply, or a click in the window) saves a snapshot first. `knobs undo` steps back one change; `knobs undo --list` shows what each snapshot was taken before. `knobs reset <id>` hands one setting back to macOS.
+
+Every command that reports something takes `--json`: `list`, `describe`, `get`, `set`, `reset`, `apply`, `undo`, `status`.
+
+MCP clients can run `knobs mcp`, a stdio MCP server with the same catalog and the same checked writes. It is read-only unless started as `knobs mcp --allow-write`; a dry run always works. Tools: `list_settings`, `describe_setting`, `get_status`, `list_snapshots`, `set_settings`, `reset_settings`, `apply_profile`, `undo`.
 
 Output follows the system language. Set `KNOBS_LANG=en` (or `zh`) for a fixed language. Values are always written in English (`on`, `off`, numbers, option names). A Chinese version of this file is `AGENTS.zh-CN.md`.
 
-Setting up a Mac from a profile: `knobs apply <file|https-url|preset> --dry-run`, show the user the list, then apply without `--dry-run`. `knobs undo` reverts the last apply (a snapshot is saved first). `knobs presets` lists the bundled presets; new ones go in `presets/` and are validated by `build.sh`.
+Setting up a Mac from a profile: `knobs apply <file|https-url|preset> --dry-run`, show the user the list, then apply without `--dry-run`. `knobs undo` reverts the apply (a snapshot is saved first). `knobs presets` lists the bundled presets; new ones go in `presets/` and are validated by `build.sh`.
 
 The only thing you cannot do for the user is grant the Accessibility permission, which instant Space switching needs. If `knobs set spaces.instant on` says it is waiting for the permission, ask the user to switch Knobs on in System Settings → Privacy & Security → Accessibility. Knobs notices within a second; confirm with `knobs status`. Never try to grant it yourself, and never use `sudo` for anything in this project.
 
