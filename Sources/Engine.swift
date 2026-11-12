@@ -193,6 +193,8 @@ enum Engine {
 
 enum Profile {
     /// Other tools whose config travels with the profile. Only these paths are ever written on import.
+    /// Today this is only Paneful, the author's own window tool; a file is exported only when it exists.
+    /// To add another tool, add its config path here (README: "Move to a new Mac").
     static let companionFiles = ["~/.config/paneful/config.json"]
     static let repoURL = "https://github.com/JJ22007/knobs"
 

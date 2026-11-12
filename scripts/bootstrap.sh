@@ -2,7 +2,7 @@
 # Set up a new Mac in one line:
 #   curl -fsSL https://raw.githubusercontent.com/JJ22007/knobs/main/scripts/bootstrap.sh | bash -s -- <profile>
 #
-# <profile> is a preset name (snappy, developer, focus, presenter, jj22007), an https link to
+# <profile> is a preset name (snappy, developer, focus, presenter), an https link to
 # someone's *.knobs.json (a gist or a file in a repo), or a local file. Without it, Knobs is
 # installed and nothing is changed.
 #

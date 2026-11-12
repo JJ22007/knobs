@@ -1,8 +1,8 @@
 <h1 align="center">Knobs</h1>
 
 <p align="center">
-  <b>Every macOS setting worth changing, in one readable list.</b><br>
-  Flip a switch and it takes effect now. Let your agent flip it for you. Take the whole setup to your next Mac in one file.
+  <b>A macOS settings layer your coding agent can trust.</b><br>
+  112 settings, each with a plain description, the macOS default and an honest note on when it takes effect. Every write is read back, and one command undoes a profile.
 </p>
 
 <p align="center">
@@ -16,30 +16,39 @@
 <p align="center">
   <img src="docs/demo.gif" width="100%" alt="An AI agent keeps the display awake, turns off window animations and exports the setup">
 </p>
-<p align="center"><sub>One sentence to Claude Code (Haiku), with no hint about Knobs: it finds the skill, changes two settings live and exports the setup. Real run; thinking time is shortened and the account name in paths is masked.</sub></p>
+<p align="center"><sub>One sentence to Claude Code (Haiku), with no hint about Knobs: it finds the skill, changes two settings live and exports the setup. Real run; thinking time is shortened and the account name in paths is masked. Knobs was built with the help of AI coding agents.</sub></p>
 
-Knobs is a small menu bar app with a settings window and a `knobs` command. It collects the tweaks developers usually paste from dotfiles (`defaults write …`, `pmset …`, yabai) and gives each one a name, an explanation, a switch, and an honest note about when it takes effect.
+Knobs is a `knobs` command plus a small menu bar app and settings window. It collects the tweaks people usually paste from dotfiles (`defaults write …`) and gives each one an id, an explanation, its accepted values, and a note on when it takes effect.
 
 ## Why
 
-- **No animation when switching Spaces, without disabling SIP.** Turn it on and your next `⌃←` / `⌃→` jumps straight to the desktop. Turn it off and the very next press slides again. No restart, no logout.
-- **Keep the display awake without `sudo`.** One switch, instant, and it gives your normal sleep timer back when you turn it off.
-- **Readable.** Over 110 settings in 13 groups, each with a plain description and the exact preference key behind it. Nothing is hidden in a shell script.
-- **Agent-ready.** `knobs list --json` tells an agent what every setting means; `knobs set` changes it. "Make my Mac feel faster" becomes a conversation.
-- **Portable.** `knobs export` writes one file. On a new Mac, hand that file to an agent and you get the same settings and the same shortcuts.
+An agent can already run `defaults write` on its own. The trouble is what happens next: the key it remembers may be years out of date, it cannot tell whether macOS accepted the value, it does not know whether the Dock needs a restart or the user needs to log out, and there is no undo. Knobs is the layer that answers those four questions.
+
+- **Typed catalog.** `knobs list --json` gives every setting's id, meaning, accepted values, current value, macOS default and when it takes effect.
+- **Checked writes.** `knobs set` rejects values outside the accepted range, reads the value back after writing, and exits 1 with the reason on stderr when macOS did not take it. It restarts the Dock or Finder only when a value actually changed.
+- **Undo.** Every `knobs apply` saves a snapshot first, and `knobs undo` puts every setting back, including handing untouched ones back to macOS. A single `knobs set` does not save a snapshot yet; `knobs reset <id>` hands one setting back to macOS.
+- **Readable and portable.** 112 settings in 13 groups, each with the exact preference key behind it. `knobs export` writes one JSON file you can apply on another Mac, from a file, a link or a preset.
+
+Also included, as conveniences rather than the reason to use Knobs:
+
+- **Instant Space switching comes from [InstantSpaceSwitcher](https://github.com/jurplel/InstantSpaceSwitcher)** by jurplel (MIT). Its code is vendored in `Vendor/ISS`; Knobs only puts the switch next to your other settings and in your profile. If instant switching is all you want, install InstantSpaceSwitcher itself: it has a Homebrew cask and a prebuilt download.
+- **Keep the display awake**, using the same power assertion as the built-in `caffeinate`.
 
 ## How it compares
 
-| | `.macos` scripts | nix-darwin | GUI tweakers | Knobs |
+| | [TinkerTool](https://www.bresink.com/osx/TinkerTool.html) | [PowerChest](https://github.com/scripsweave/PowerChest) | [nix-darwin](https://github.com/nix-darwin/nix-darwin) | Knobs |
 |---|---|---|---|---|
-| Readable list of what each setting does | comments | option docs | yes | yes, with the macOS default and when it applies |
-| Takes effect without a logout when macOS allows | after `killall` | after rebuild | mostly | yes, and says honestly when it cannot |
-| Instant Space switching without disabling SIP | no | no | no | yes |
-| An AI agent can read, explain and change it | raw `defaults` | edit Nix | no | `knobs list --json`, a Claude Code skill, exit codes |
-| Share a setup | copy the script | share the flake | rarely | one JSON file, a link, or a preset |
-| Undo | write it yourself | roll back | some | `knobs undo` after every apply |
+| What it is | free GUI for hidden settings | open-source GUI for hidden settings | declarative config for the whole Mac | settings catalog with a CLI for agents, plus a GUI |
+| Number of settings | more than Knobs | 80+ (README) | Dock, Finder, global defaults and much more | 112 |
+| An agent can list, validate and change settings | no | no | by editing Nix files | `knobs list --json`, `knobs set`, exit codes |
+| Says when each change takes effect | for some settings | restarts the Dock or Finder when needed | after a rebuild | every setting: now, apps opened later, or after logout |
+| Undo | restore the original state | snapshot before every change | roll back a generation | snapshot before every `apply`, not yet for `set` |
+| Share a setup | no | export and import a profile | share the flake | one JSON file, a link or a preset |
+| Install | signed download | DMG download | Nix | build from source with the Command Line Tools; no signed download yet |
 
-Knobs is not a replacement for a full dotfiles or Nix setup. It is the part you can hand to anyone, or to an agent, and read in a minute.
+Where Knobs is worse: fewer settings than TinkerTool, no signed download or Homebrew cask yet, and PowerChest also snapshots single changes. Knobs is not a replacement for a full dotfiles or Nix setup.
+
+**Why not just `defaults write`, nix-darwin, TinkerTool or PowerChest?** Use them if they fit. `defaults write` from memory is what Knobs is meant to replace for agents; nix-darwin manages far more but needs Nix and a rebuild; TinkerTool and PowerChest are good GUIs with no interface an agent can call. Knobs is for when you want an agent to change your Mac's settings and still know what it changed, whether it worked, and how to undo it.
 
 ## Install
 
@@ -90,7 +99,7 @@ Each setting says when it takes effect:
 
 ## Let an agent drive
 
-`build.sh install` also installs a [Claude Code skill](https://docs.claude.com/en/docs/claude-code/skills) at `~/.claude/skills/knobs`, so Claude Code knows about Knobs in every folder: ask "stop my screen from sleeping" anywhere and it reaches for `knobs` on its own. `knobs skill remove` takes it out; `knobs skill` prints it for other agents. Other agents can read [AGENTS.md](AGENTS.md).
+If you use Claude Code, `build.sh install` asks whether to add a [Claude Code skill](https://docs.claude.com/en/docs/claude-code/skills) at `~/.claude/skills/knobs`, so Claude Code knows about Knobs in every folder: ask "stop my screen from sleeping" anywhere and it reaches for `knobs` on its own. Nothing is written there without a yes (or `KNOBS_SKILL=1`); an existing Knobs skill is kept up to date. `knobs skill install` adds it later, `knobs skill remove` takes it out, and `knobs skill` prints it for other agents. Other agents can read [AGENTS.md](AGENTS.md).
 
 ```bash
 knobs list --json              # every setting: id, meaning, accepted values, current value, when it applies
@@ -115,7 +124,7 @@ On the old Mac:
 knobs export ~/Desktop/my-mac.knobs.json
 ```
 
-The file holds every setting you changed, your Space shortcuts, and the config of companion tools ([Paneful](https://github.com/JJ22007/paneful) window shortcuts). It also carries its own instructions, so on the new Mac you can give it to any coding agent and say:
+The file holds every setting you changed, your Space shortcuts, and the config files of known companion tools. Today that list has one entry, `~/.config/paneful/config.json` for [Paneful](https://github.com/JJ22007/paneful), the author's own window tool; it is only exported when the file exists, and the list lives in `Profile.companionFiles` in `Sources/Engine.swift`. It also carries its own instructions, so on the new Mac you can give it to any coding agent and say:
 
 > Set up this Mac from `my-mac.knobs.json`.
 
@@ -143,7 +152,7 @@ A brand-new Mac needs one line. It installs Knobs, shows what the profile change
 curl -fsSL https://raw.githubusercontent.com/JJ22007/knobs/main/scripts/bootstrap.sh | bash -s -- <preset, link or file>
 ```
 
-Ready-made presets ship with the app (`knobs presets`), and pull requests with new ones are welcome in [`presets/`](presets):
+Ready-made presets ship with the app (`knobs presets`), and pull requests with new ones are welcome in [`presets/`](presets). [`examples/`](examples) holds the author's own profile as a real-world example; it is not bundled.
 
 | Preset | For |
 |---|---|
@@ -151,7 +160,6 @@ Ready-made presets ship with the app (`knobs presets`), and pull requests with n
 | `developer` | fast key repeat, no autocorrect or smart punctuation, every file and path visible |
 | `focus` | fewer things asking for attention, a clean desktop, no pop-ups when you plug things in |
 | `presenter` | demos and screen sharing: display stays on, clean desktop, quiet corners |
-| `jj22007` | the author's own Mac, including the [Paneful](https://github.com/JJ22007/paneful) shortcuts |
 
 Only settings in the catalog and the companion files listed in `Engine.swift` can be written by a profile, and `--dry-run` always shows the full list first. Read a stranger's profile before applying it, the same as any dotfile.
 
