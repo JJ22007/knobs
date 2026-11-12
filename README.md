@@ -109,6 +109,7 @@ knobs reset dock.autohideDelay # hand it back to the macOS default
 knobs set spaces.instant on    # reports whether it is really active, and why not if it is not
 knobs set dock.size 48 --dry-run --json   # preview; --json gives before, after, verified, takesEffect
 knobs undo                     # step back one change; knobs undo --list shows the history
+knobs verify                   # read-only: do the keys written on this Mac match the catalog?
 knobs status
 ```
 

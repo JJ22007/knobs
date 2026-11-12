@@ -177,6 +177,64 @@ enum Changes {
     }
 }
 
+// MARK: - Checking the catalog against this Mac
+
+enum Verify {
+    /// Read-only. For every setting whose key is written on this Mac, check that macOS stores it
+    /// in the shape the catalog expects (a switch is a boolean, a number is in range, a choice is
+    /// one of the listed values). Unset keys cannot be checked: macOS decides their value.
+    static func run() -> [String: Any] {
+        var rows: [[String: Any]] = []
+        var counts = ["ok": 0, "unset": 0, "mismatch": 0, "live": 0]
+        for s in catalog {
+            var row: [String: Any] = ["id": s.id, "backedBy": s.keyDescription]
+            switch s.backing {
+            case .live:
+                row["result"] = "live"
+            case .prefs(let prefs, _):
+                let raw = Prefs.read(prefs[0])
+                if raw == nil {
+                    row["result"] = "unset"
+                } else if let problem = problem(s, raw!, prefs) {
+                    row["result"] = "mismatch"
+                    row["stored"] = raw!.any
+                    row["problem"] = problem
+                } else {
+                    row["result"] = "ok"
+                    row["stored"] = raw!.any
+                }
+            }
+            let result = row["result"] as! String
+            counts[result, default: 0] += 1
+            rows.append(row)
+        }
+        return ["macOS": ProcessInfo.processInfo.operatingSystemVersionString, "counts": counts,
+                "ok": counts["mismatch"] == 0, "settings": rows]
+    }
+
+    private static func problem(_ s: Setting, _ raw: Value, _ prefs: [Pref]) -> String? {
+        switch s.kind {
+        case .toggle:
+            if case .string = raw { return "stored as text, expected a boolean" }
+            if raw.asBool == nil { return "not a boolean" }
+        case .number(let min, let max, _, _, _):
+            guard let d = raw.asDouble, raw.asString == nil else { return "not a number" }
+            if d < min || d > max { return "\(d) is outside \(Value.double(min))–\(Value.double(max))" }
+        case .choice(let options):
+            let text: String? = s.intChoice ? raw.asDouble.map { String(Int($0)) } : raw.asString
+            guard let text else { return "not a \(s.intChoice ? "number" : "text") choice" }
+            if !options.contains(where: { $0.value == text }) { return "\"\(text)\" is not one of the listed choices" }
+        case .text:
+            if raw.asString == nil { return "not text" }
+        }
+        // Settings written to several keys at once should agree on whether they are set.
+        for p in prefs.dropFirst() where Prefs.read(p) == nil {
+            return "\(p.domain) \(p.key) is not set, although \(prefs[0].key) is"
+        }
+        return nil
+    }
+}
+
 /// Paths in output use ~ so agent transcripts and logs do not carry the account name.
 func tildePath(_ path: String) -> String { (path as NSString).abbreviatingWithTildeInPath }
 

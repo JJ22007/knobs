@@ -14,7 +14,7 @@ struct MCPServer {
 
     private var instructions: String {
         """
-        Knobs changes macOS settings safely. Call list_settings first: every setting has an id, a plain description, \
+        Knobs changes macOS settings safely. Use list_settings (or describe_setting when you already know the id) to find a setting: every setting has an id, a plain description, \
         accepted values, the macOS default and when a change takes effect (instant, newWindows = apps opened from now on, \
         relogin = after logging out and back in). Tell the user about anything that is not instant. \
         Writes save a snapshot first and return the value read back from macOS (verified); undo steps back one change. \
@@ -50,6 +50,9 @@ struct MCPServer {
              schema: object(["id": ["type": "string"]], required: ["id"]), writes: false),
         Tool(name: "get_status",
              description: "Whether the Knobs app is running, whether the Accessibility permission is granted, the state of each live feature, and how many undo steps exist.",
+             schema: object([:]), writes: false),
+        Tool(name: "verify_catalog",
+             description: "Read-only check: for every key already written on this Mac, does macOS store it in the shape the catalog expects? Lists mismatches; unset keys cannot be checked.",
              schema: object([:]), writes: false),
         Tool(name: "list_snapshots", description: "The undo history, newest first, with what each snapshot was taken before.",
              schema: object([:]), writes: false),
@@ -100,6 +103,11 @@ struct MCPServer {
             return (CLI.record(s, live: CLI.liveStates()), false)
         case "get_status":
             return (CLI.statusJSON(), false)
+        case "verify_catalog":
+            let r = Verify.run()
+            var short = r
+            short["settings"] = (r["settings"] as? [[String: Any]] ?? []).filter { $0["result"] as? String == "mismatch" }
+            return (short, false)
         case "list_snapshots":
             return (["snapshots": Profile.backups().map { ["path": tildePath($0), "before": Profile.reason(ofSnapshot: $0)] }], false)
         case "set_settings":
