@@ -8,7 +8,7 @@
 import AppKit
 
 enum CLI {
-    static let commands: Set<String> = ["list", "get", "describe", "set", "reset", "export", "apply", "shortcut", "status", "open", "skill", "presets", "undo", "mcp", "help", "--help", "-h"]
+    static let commands: Set<String> = ["list", "get", "describe", "set", "reset", "export", "apply", "shortcut", "status", "open", "skill", "presets", "undo", "verify", "mcp", "help", "--help", "-h"]
 
     private static let usageEN = """
     knobs: read and change macOS settings from scripts and agents.
@@ -27,6 +27,7 @@ enum CLI {
       knobs presets                                ready-made profiles you can apply by name
       knobs undo [--list] [--json]                 undo the last change (set, reset, apply or the window)
       knobs status [--json]                        is the app running, and are the live features active
+      knobs verify [--json]                        check every written key on this Mac against the catalog (read-only)
       knobs open                                   open the Knobs window
       knobs skill [install|remove]                 teach Claude Code about knobs in every folder (a user-level skill)
       knobs mcp [--allow-write]                    run as an MCP server on stdin/stdout (read-only unless --allow-write)
@@ -54,6 +55,7 @@ enum CLI {
       knobs presets                                列出可以直接按名字应用的现成配置
       knobs undo [--list] [--json]                 撤销上一次修改(set、reset、apply 或窗口里的改动)
       knobs status [--json]                        应用是否在运行,实时功能是否生效
+      knobs verify [--json]                        在这台 Mac 上核对每个已写入的键是否符合目录(只读)
       knobs open                                   打开 Knobs 窗口
       knobs skill [install|remove]                 让 Claude Code 在任何文件夹都认识 knobs(用户级 skill)
       knobs mcp [--allow-write]                    作为 MCP server 运行(stdin/stdout;不加 --allow-write 时只读)
@@ -90,6 +92,7 @@ enum CLI {
         case "skill": return skill(rest.first ?? "print")
         case "presets": return presets()
         case "undo": return undo(list: flag("--list"), json: json)
+        case "verify": return verify(json: json)
         case "mcp": return MCPServer(allowWrite: flag("--allow-write")).run()
         default: print(usage); return 0
         }
@@ -424,6 +427,18 @@ enum CLI {
                 "已撤销“\(result.reason)”:恢复了 \(result.report.changed.count) 项。还剩 \(Profile.backups().count) 个更早的快照。"))
         result.report.problems.forEach { _ = fail($0) }
         return result.report.problems.isEmpty ? 0 : 1
+    }
+
+    private static func verify(json: Bool) -> Int32 {
+        let r = Verify.run()
+        if json { print(jsonText(r)); return r["ok"] as? Bool == true ? 0 : 1 }
+        let counts = r["counts"] as? [String: Int] ?? [:]
+        for row in r["settings"] as? [[String: Any]] ?? [] where row["result"] as? String == "mismatch" {
+            print("\(row["id"] ?? "")  \(row["backedBy"] ?? "")  \(row["problem"] ?? "")")
+        }
+        print(L("macOS \(r["macOS"] ?? ""): \(counts["ok"] ?? 0) written keys match the catalog, \(counts["mismatch"] ?? 0) do not, \(counts["unset"] ?? 0) are unset (macOS decides), \(counts["live"] ?? 0) are provided by the app.",
+                "macOS \(r["macOS"] ?? ""):\(counts["ok"] ?? 0) 个已写入的键符合目录,\(counts["mismatch"] ?? 0) 个不符合,\(counts["unset"] ?? 0) 个没写过(由 macOS 决定),\(counts["live"] ?? 0) 个由应用提供。"))
+        return r["ok"] as? Bool == true ? 0 : 1
     }
 
     private static func presets() -> Int32 {

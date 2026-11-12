@@ -12,9 +12,11 @@ The command is `~/.local/bin/knobs` (a link into `~/Applications/Knobs.app`). If
 4. Tell the user about `takesEffect` when it is not instant (reopen the app, or log out and back in).
 5. Every change (set, reset, apply, or a click in the window) saves a snapshot first. `knobs undo` steps back one change; `knobs undo --list` shows what each snapshot was taken before. `knobs reset <id>` hands one setting back to macOS.
 
-Every command that reports something takes `--json`: `list`, `describe`, `get`, `set`, `reset`, `apply`, `undo`, `status`.
+Every command that reports something takes `--json`: `list`, `describe`, `get`, `set`, `reset`, `apply`, `undo`, `status`, `verify`.
 
-MCP clients can run `knobs mcp`, a stdio MCP server with the same catalog and the same checked writes. It is read-only unless started as `knobs mcp --allow-write`; a dry run always works. Tools: `list_settings`, `describe_setting`, `get_status`, `list_snapshots`, `set_settings`, `reset_settings`, `apply_profile`, `undo`.
+`knobs verify` is read-only: for every key already written on this Mac it checks that macOS stores it in the shape the catalog expects, and lists any mismatch. Keys that were never written cannot be checked this way.
+
+MCP clients can run `knobs mcp`, a stdio MCP server with the same catalog and the same checked writes. It is read-only unless started as `knobs mcp --allow-write`; a dry run always works. Tools: `list_settings`, `describe_setting`, `get_status`, `verify_catalog`, `list_snapshots`, `set_settings`, `reset_settings`, `apply_profile`, `undo`.
 
 Output follows the system language. Set `KNOBS_LANG=en` (or `zh`) for a fixed language. Values are always written in English (`on`, `off`, numbers, option names). A Chinese version of this file is `AGENTS.zh-CN.md`.
 

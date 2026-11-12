@@ -12,9 +12,11 @@
 4. `takesEffect` 不是"立即生效"时要告诉用户(重新打开 App,或注销重新登录)。
 5. 每次修改(set、reset、apply,或在窗口里点一下)之前都会先存快照。`knobs undo` 一次撤回一步;`knobs undo --list` 列出每个快照是在什么修改之前存的。`knobs reset <id>` 把单项交还给 macOS。
 
-所有会输出结果的命令都支持 `--json`:`list`、`describe`、`get`、`set`、`reset`、`apply`、`undo`、`status`。
+所有会输出结果的命令都支持 `--json`:`list`、`describe`、`get`、`set`、`reset`、`apply`、`undo`、`status`、`verify`。
 
-支持 MCP 的客户端可以运行 `knobs mcp`:一个 stdio MCP server,用同一份设置目录和同样带校验的写入。默认只读,用 `knobs mcp --allow-write` 启动才允许修改;预览(dryRun)始终可用。工具有:`list_settings`、`describe_setting`、`get_status`、`list_snapshots`、`set_settings`、`reset_settings`、`apply_profile`、`undo`。
+`knobs verify` 只读:对这台 Mac 上已经写入的每个键,检查 macOS 存的类型和取值是否符合目录,并列出不符合的。从没写过的键没法用这种方法检查。
+
+支持 MCP 的客户端可以运行 `knobs mcp`:一个 stdio MCP server,用同一份设置目录和同样带校验的写入。默认只读,用 `knobs mcp --allow-write` 启动才允许修改;预览(dryRun)始终可用。工具有:`list_settings`、`describe_setting`、`get_status`、`verify_catalog`、`list_snapshots`、`set_settings`、`reset_settings`、`apply_profile`、`undo`。
 
 输出语言跟随系统。需要固定语言时加环境变量:`KNOBS_LANG=en` 或 `KNOBS_LANG=zh`。设置的值始终用英文书写(`on`、`off`、数字、选项名)。
 
