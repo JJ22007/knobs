@@ -91,6 +91,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
             menu.addItem(item)
         }
         menu.addItem(.separator())
+        let steps = Profile.backups().count
+        let undo = NSMenuItem(title: steps == 0 ? L("Nothing to undo", "没有可撤销的") : L("Undo last change", "撤销上一次修改"),
+                              action: steps == 0 ? nil : #selector(undoLast), keyEquivalent: "")
+        undo.target = self
+        undo.toolTip = steps == 0 ? nil : Profile.reason(ofSnapshot: Profile.backups()[0])
+        menu.addItem(undo)
         let open = NSMenuItem(title: L("Open Knobs…", "打开 Knobs…"), action: #selector(showWindow), keyEquivalent: ",")
         open.target = self
         menu.addItem(open)
@@ -100,6 +106,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSWind
     @objc private func toggleLive(_ item: NSMenuItem) {
         guard let id = item.representedObject as? String, let s = catalogByID[id] else { return }
         model.set(s, .bool(item.state != .on))
+    }
+
+    @objc private func undoLast() {
+        model.undo()
     }
 
     @objc func openAccessibility() {

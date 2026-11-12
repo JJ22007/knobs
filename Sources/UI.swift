@@ -17,6 +17,12 @@ final class Model: ObservableObject {
     @Published var search = ""
     @Published var selection: String? = "all"
     @Published var banner: String?
+    /// The banner reports a problem rather than news; it is drawn in orange.
+    @Published var bannerIsError = false
+    /// The banner follows a change that can be undone, so it offers an Undo button.
+    @Published var bannerCanUndo = false
+    /// Snapshots on disk: how many steps `knobs undo` (and the Undo button) can go back.
+    @Published var undoSteps = 0
     /// Slider positions and text drafts that are not committed yet, by setting id.
     /// (Kept here rather than in @State: the command line toolchain has no SwiftUI macro plugin.)
     @Published var dragging: [String: Double] = [:]
@@ -41,10 +47,30 @@ final class Model: ObservableObject {
         self.notes = notes
         self.needsPermission = Live.shared.needsPermission
         self.active = Set(Live.shared.states.filter { $0.value.active }.keys)
+        self.undoSteps = Profile.backups().count
+    }
+
+    func show(_ text: String, error: Bool = false, canUndo: Bool = false) {
+        banner = text
+        bannerIsError = error
+        bannerCanUndo = canUndo
+    }
+
+    /// Every change from the window saves a snapshot first, the same as `knobs set`,
+    /// so the Undo button and `knobs undo` share one history.
+    private func snapshotIfChanging(_ s: Setting, to value: Value?) -> Bool {
+        let now = Engine.current(s)
+        if case .live = s.backing, (now?.asBool ?? false) == (value?.asBool ?? false) { return false }
+        if let value, let wanted = try? Engine.validate(s, value), wanted == now { return false }
+        if value == nil, now == nil { return false }
+        let what = value.map { "\(s.id) \($0)" } ?? L("\(s.id) back to the default", "\(s.id) 恢复默认")
+        return Profile.saveSnapshot(reason: L("window: ", "窗口:") + what) != nil
     }
 
     func set(_ s: Setting, _ value: Value) {
         do {
+            _ = try Engine.validate(s, value)
+            _ = snapshotIfChanging(s, to: value)
             let restart = try Engine.set(s, value)
             banner = nil
             if case .live = s.backing { AppDelegate.shared.reload(askForPermission: true) }
@@ -52,16 +78,31 @@ final class Model: ObservableObject {
             // Restarting the Dock or Finder takes a moment; keep the window responsive meanwhile.
             if !restart.isEmpty { DispatchQueue.global(qos: .userInitiated).async { Prefs.restart(restart) } }
         } catch {
-            banner = "\(error)"
+            show("\(error)", error: true)
             refresh()
         }
     }
 
     func reset(_ s: Setting) {
+        let saved = snapshotIfChanging(s, to: nil)
         let restart = Engine.reset(s)
         if case .live = s.backing { AppDelegate.shared.reload() }
         refresh()
+        if saved { show(L("\(s.title): back to the macOS default.", "\(s.title):已恢复为 macOS 默认。"), canUndo: true) }
         if !restart.isEmpty { DispatchQueue.global(qos: .userInitiated).async { Prefs.restart(restart) } }
+    }
+
+    /// Step back one change, whoever made it: this window, the menu bar, `knobs` or an agent.
+    func undo() {
+        let r = Changes.undo()
+        AppDelegate.shared.reload()
+        refresh()
+        if let error = r.error { show(error, error: true); return }
+        let restored = r.report.changed
+        var text = L("Undid \"\(r.reason)\".", "已撤销“\(r.reason)”。")
+        if !restored.isEmpty { text += " " + restored.prefix(4).joined(separator: "; ") + (restored.count > 4 ? " …" : "") }
+        if !r.report.problems.isEmpty { text += " " + r.report.problems.joined(separator: "; ") }
+        show(text, error: !r.report.problems.isEmpty, canUndo: undoSteps > 0)
     }
 
     var visible: [(category: Category, settings: [Setting])] {
@@ -96,8 +137,8 @@ final class Model: ObservableObject {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             try Profile.exportText().write(to: url, atomically: true, encoding: .utf8)
-            banner = L("Exported to \(url.path). Give this file to an agent on a new Mac.", "已导出到 \(url.path)。换新电脑时把这个文件交给 agent 即可。")
-        } catch { banner = L("Could not write the file.", "无法写入文件。") }
+            show(L("Exported to \((url.path as NSString).abbreviatingWithTildeInPath). Give this file to an agent on a new Mac.", "已导出到 \((url.path as NSString).abbreviatingWithTildeInPath)。换新电脑时把这个文件交给 agent 即可。"))
+        } catch { show(L("Could not write the file.", "无法写入文件。"), error: true) }
     }
 
     func importProfile() {
@@ -107,7 +148,7 @@ final class Model: ObservableObject {
         do {
             let preview = try Profile.apply(text: text, dryRun: true)
             guard !preview.changed.isEmpty else {
-                banner = L("Nothing to change: this Mac already matches the profile.", "无需更改:这台 Mac 已经和配置文件一致。")
+                show(L("Nothing to change: this Mac already matches the profile.", "无需更改:这台 Mac 已经和配置文件一致。"))
                 return
             }
             let alert = NSAlert()
@@ -116,12 +157,12 @@ final class Model: ObservableObject {
             alert.addButton(withTitle: L("Apply", "应用"))
             alert.addButton(withTitle: L("Cancel", "取消"))
             guard alert.runModal() == .alertFirstButtonReturn else { return }
-            let done = try Profile.apply(text: text, dryRun: false)
+            let done = try Profile.apply(text: text, dryRun: false, reason: L("window: import ", "窗口:导入 ") + url.lastPathComponent)
             AppDelegate.shared.reload(askForPermission: true)
             refresh()
-            banner = L("Applied \(done.changed.count) changes. A snapshot was saved first: `knobs undo` puts everything back.", "已应用 \(done.changed.count) 项更改。应用前已自动存了快照,运行 `knobs undo` 即可全部恢复。")
-                + (done.problems.isEmpty ? "" : " " + done.problems.joined(separator: "; "))
-        } catch { banner = "\(error)" }
+            show(L("Applied \(done.changed.count) changes. A snapshot was saved first, so Undo puts them all back.", "已应用 \(done.changed.count) 项更改。应用前已自动存了快照,点“撤销”即可全部恢复。")
+                 + (done.problems.isEmpty ? "" : " " + done.problems.joined(separator: "; ")), error: !done.problems.isEmpty, canUndo: true)
+        } catch { show("\(error)", error: true) }
     }
 
     func copyAgentPrompt() {
@@ -129,11 +170,12 @@ final class Model: ObservableObject {
         You can read and change my macOS settings with the `knobs` command (\(Profile.repoURL)).
         Run `~/.local/bin/knobs list --json` to see every setting with its id, meaning, current value and when a change takes effect.
         Use `knobs set <id> <value>` to change one, `knobs reset <id>` to hand it back to macOS, and `knobs describe <id>` for details.
+        Every change saves a snapshot first; `knobs undo` steps back one change. Add --json to any command for machine-readable output.
         Tell me what you changed and what each setting does. Ask before changing anything I did not mention.
         """
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
-        banner = L("Copied. Paste it to your agent.", "已复制,粘贴给你的 agent 即可。")
+        show(L("Copied. Paste it to your agent.", "已复制,粘贴给你的 agent 即可。"))
     }
 }
 
@@ -193,7 +235,10 @@ struct MainView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 26) {
                     if model.needsPermission { PermissionBanner() }
-                    if let banner = model.banner { MessageBanner(text: banner) { model.banner = nil } }
+                    if let banner = model.banner {
+                        MessageBanner(text: banner, isError: model.bannerIsError,
+                                      undo: model.bannerCanUndo && model.undoSteps > 0 ? { model.undo() } : nil) { model.banner = nil }
+                    }
                     if model.selection == "all", model.search.isEmpty { QuickBar(model: model) }
                     if model.selection == "changed" { SetupIntro(model: model) }
                     let groups = model.visible
@@ -219,6 +264,11 @@ struct MainView: View {
             .searchable(text: $model.search, prompt: L("Search settings", "搜索设置"))
             .toolbar {
                 ToolbarItemGroup {
+                    Button { model.undo() } label: { Label { Text(L("Undo", "撤销")) } icon: { Image(nsImage: lucide("undo-2")) } }
+                        .disabled(model.undoSteps == 0)
+                        .keyboardShortcut("z", modifiers: .command)
+                        .help(model.undoSteps == 0 ? L("Nothing to undo yet. Every change saves a snapshot first.", "还没有可撤销的。每次修改前都会先存快照。")
+                              : L("Undo the last change, from here, the menu bar, the command line or an agent (\(model.undoSteps) steps)", "撤销最近一次修改,不论是在这里、菜单栏、命令行还是 agent 改的(还能撤 \(model.undoSteps) 步)"))
                     Button { model.copyAgentPrompt() } label: { Label { Text(L("Agent prompt", "Agent 提示词")) } icon: { Image(nsImage: lucide("square-terminal")) } }
                         .help(L("Copy a prompt that teaches your agent to use Knobs", "复制一段提示词,让你的 agent 学会操作 Knobs"))
                     Button { model.importProfile() } label: { Label { Text(L("Import", "导入")) } icon: { Image(nsImage: lucide("download")) } }
@@ -372,15 +422,20 @@ struct SetupIntro: View {
 
 struct MessageBanner: View {
     let text: String
+    var isError = false
+    var undo: (() -> Void)?
     let dismiss: () -> Void
     var body: some View {
-        HStack(alignment: .top) {
+        HStack(alignment: .center, spacing: 10) {
+            if isError { Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange) }
             Text(text).fixedSize(horizontal: false, vertical: true).textSelection(.enabled)
             Spacer(minLength: 8)
+            if let undo { Button(L("Undo", "撤销"), action: undo) }
             Button(action: dismiss) { Image(systemName: "xmark") }.buttonStyle(.plain).foregroundStyle(.secondary)
+                .help(L("Dismiss", "关闭"))
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.accentColor.opacity(0.12)))
+        .background(RoundedRectangle(cornerRadius: 12).fill((isError ? Color.orange : Color.accentColor).opacity(0.12)))
     }
 }
 
@@ -410,7 +465,12 @@ struct SettingRow: View {
                         Circle().fill(Color.green).frame(width: 6, height: 6)
                         Text(L("Active", "已生效")).font(.caption).foregroundStyle(.secondary)
                     } else if isChanged, !isLive { Pill(text: L("Customized", "已自定义")) }
-                    if setting.timing != .instant { Pill(text: setting.timing.label) }
+                    if setting.timing != .instant {
+                        Pill(text: setting.timing.label)
+                            .help(setting.timing == .relogin
+                                  ? L("macOS only reads this when you log in. The change is saved now and shows after you log out and back in.", "macOS 只在登录时读取这一项。修改已经保存,注销重新登录后才会看到效果。")
+                                  : L("Apps that are already open keep the old behaviour until you quit and reopen them.", "已经打开的 App 保持原样,退出再打开后才会用新设置。"))
+                    }
                 }
                 Text(setting.detail).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 if let note = model.notes[setting.id] {
@@ -423,7 +483,7 @@ struct SettingRow: View {
             Spacer(minLength: 12)
             if isChanged, !isLive {
                 Button(L("Reset", "恢复默认")) { model.reset(setting) }
-                    .buttonStyle(.borderless).font(.caption).foregroundStyle(.secondary)
+                    .buttonStyle(.bordered).controlSize(.small)
                     .help(L("Hand this setting back to macOS", "把这一项交还给 macOS 默认值"))
             }
             control
