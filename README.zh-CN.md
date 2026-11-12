@@ -123,6 +123,21 @@ knobs status
 
 窗口里的"Agent 提示词"按钮可以直接复制一段现成的提示词。全部成功时退出码为 0;有任何一项被拒绝时为 1,原因写在 stderr(加 `--json` 时在 `errors` 里),agent 能据此判断。
 
+## 场景:设置和其他工具一起切换
+
+场景就是一个配置文件,只是它还能通过其他工具自己的 agent 接口去控制它们。目前支持的是作者的亮度工具 [Overbright](https://github.com/JJ22007/overbright):场景可以设置内建屏幕的亮度,并由 Overbright 读回屏幕的实际亮度,证明真的生效了。
+
+```bash
+knobs scene                      # 列出场景
+knobs scene present --dry-run    # 预览会改什么,亮度也在内
+knobs scene present              # 切换
+knobs undo                       # 全部还原,亮度也会还原
+```
+
+`present`(演示模式)会让屏幕不熄灭、隐藏桌面图标和小组件、自动隐藏程序坞、关掉触发角,并用 Overbright 把屏幕提亮到 130%。整个切换只存一份快照,所以一次 `knobs undo` 就能把设置和亮度一起还原。没装 Overbright 时会跳过亮度并在结果里说明。勿扰模式不在其中:专注模式没有 Knobs 能写入并回读确认的设置。
+
+想在自己的配置里加上亮度,写 `"overbright": { "percent": 130 }`(0–100 是背光,100 以上是增亮)。Knobs 调用的是 `overbright mcp`,不会去改 Overbright 的文件。
+
 ## 换新电脑
 
 在旧电脑上:

@@ -14,6 +14,8 @@
 
 所有会输出结果的命令都支持 `--json`:`list`、`describe`、`get`、`set`、`reset`、`apply`、`undo`、`status`、`verify`。
 
+场景:`knobs scene` 列出场景,`knobs scene <名称> [--dry-run] [--json]` 切换。场景就是可以额外带 `"overbright": {"percent": N}` 的配置文件;Knobs 会调用 `overbright mcp`,并报告 Overbright 的回读结果(`reached` 或 `restored` 表示已证实)。快照里包含亮度,所以 `knobs undo` 也会还原亮度。通过 MCP 时,用 `apply_profile` 加场景名。
+
 `knobs verify` 只读:对这台 Mac 上已经写入的每个键,检查 macOS 存的类型和取值是否符合目录,并列出不符合的。从没写过的键没法用这种方法检查。
 
 支持 MCP 的客户端可以运行 `knobs mcp`:一个 stdio MCP server,用同一份设置目录和同样带校验的写入。默认只读,用 `knobs mcp --allow-write` 启动才允许修改;预览(dryRun)始终可用。工具有:`list_settings`、`describe_setting`、`get_status`、`verify_catalog`、`list_snapshots`、`set_settings`、`reset_settings`、`apply_profile`、`undo`。

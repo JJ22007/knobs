@@ -242,8 +242,9 @@ enum Profile {
 
     /// Everything as it is now, including which settings are untouched, so applying the
     /// snapshot later puts the Mac back exactly (settings a profile turned on get reset).
-    static func snapshot(reason: String) -> [String: Any] {
+    static func snapshot(reason: String, extra: [String: Any] = [:]) -> [String: Any] {
         var obj = export()
+        for (k, v) in extra { obj[k] = v }
         obj["about"] = "A Knobs snapshot taken automatically before a change. `knobs undo` restores it."
         obj["reason"] = reason
         obj["reset"] = catalog.filter { s in
@@ -259,7 +260,7 @@ enum Profile {
 
     /// Saves a snapshot and keeps the newest `snapshotLimit`. Returns its path.
     @discardableResult
-    static func saveSnapshot(reason: String) -> String? {
+    static func saveSnapshot(reason: String, extra: [String: Any] = [:]) -> String? {
         let fm = FileManager.default
         try? fm.createDirectory(atPath: backupDirectory, withIntermediateDirectories: true)
         // Milliseconds keep two changes in the same second apart and in order.
@@ -267,7 +268,7 @@ enum Profile {
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let stamp = f.string(from: Date()).replacingOccurrences(of: ":", with: "-")
         let path = backupDirectory + "/\(stamp).knobs.json"
-        guard let data = try? JSONSerialization.data(withJSONObject: snapshot(reason: reason), options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
+        guard let data = try? JSONSerialization.data(withJSONObject: snapshot(reason: reason, extra: extra), options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
               fm.createFile(atPath: path, contents: data) else { return nil }
         for old in backups().dropFirst(snapshotLimit) { try? fm.removeItem(atPath: old) }
         return path
@@ -319,8 +320,12 @@ enum Profile {
         }
         // Before changing anything, remember how things were so `knobs undo` can put them back.
         var report = Report()
+        // A scene can also set Overbright's brightness; the snapshot then remembers where it was.
+        let brightness = (obj["overbright"] as? [String: Any])?["percent"] as? NSNumber
         if !dryRun, snapshot, let preview = try? apply(text: text, dryRun: true), !preview.changed.isEmpty {
-            report.snapshot = saveSnapshot(reason: reason)
+            var extra: [String: Any] = [:]
+            if brightness != nil, let now = Overbright.currentPercent() { extra["overbright"] = ["percent": now] }
+            report.snapshot = saveSnapshot(reason: reason, extra: extra)
         }
         var restart = Set<String>()
 
@@ -332,7 +337,10 @@ enum Profile {
             guard isOn else { continue }
             report.changed.append("\(id): \(now.map { "\($0)" } ?? "") → \(L("macOS default", "macOS 默认"))")
             report.note("setting", id, now?.any, s.systemDefault?.any)
-            if !dryRun { restart.formUnion(Engine.reset(s)) }
+            if !dryRun {
+                restart.formUnion(Engine.reset(s))
+                report.details[report.details.count - 1]["verified"] = Engine.current(s) == nil || { if case .live = s.backing { return true }; return false }()
+            }
         }
 
         for id in settings.keys.sorted() {
@@ -346,8 +354,13 @@ enum Profile {
             report.changed.append("\(id): \((now ?? s.systemDefault).map { "\($0)" } ?? L("system default", "系统默认")) → \(wanted)")
             report.note("setting", id, (now ?? s.systemDefault)?.any, wanted.any)
             if dryRun { continue }
-            do { restart.formUnion(try Engine.set(s, wanted)) }
-            catch { report.problems.append("\(error)") }
+            do {
+                restart.formUnion(try Engine.set(s, wanted))
+                report.details[report.details.count - 1]["verified"] = true   // Engine.set read it back
+            } catch {
+                report.details[report.details.count - 1]["verified"] = false
+                report.problems.append("\(error)")
+            }
         }
 
         if let shortcuts = obj["shortcuts"] as? [String: String] {
@@ -382,6 +395,23 @@ enum Profile {
         }
 
         if !dryRun { Prefs.restart(restart) }
+
+        if let wanted = brightness?.doubleValue {
+            if !Overbright.installed {
+                report.problems.append(L("overbright: not installed, brightness skipped (https://github.com/JJ22007/overbright)", "overbright:没有安装,已跳过亮度(https://github.com/JJ22007/overbright)"))
+            } else if let now = Overbright.currentPercent(), abs(now - wanted) < 0.5 {
+                report.unchanged += 1
+            } else if dryRun {
+                let now = Overbright.currentPercent()
+                report.changed.append("overbright: \(now.map { "\(Int($0))%" } ?? "?") → \(Int(wanted))%")
+                report.details.append(["kind": "overbright", "id": "overbright.percent", "before": now ?? NSNull(), "after": wanted])
+            } else {
+                let (entry, ok) = Overbright.set(percent: wanted)
+                report.changed.append("overbright: \((entry["before"] as? Double).map { "\(Int($0))%" } ?? "?") → \(Int(wanted))%  (\(entry["readback"] ?? "no answer"))")
+                report.details.append(entry)
+                if !ok { report.problems.append("overbright: \(entry["error"] ?? "")") }
+            }
+        }
         return report
     }
 }
