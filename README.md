@@ -129,6 +129,21 @@ Tell your agent something like:
 
 The "Agent prompt" button in the window copies a ready-made version. The exit code is 0 when everything applied and 1 when something was refused, with the reason on stderr (or in `errors` with `--json`), so an agent can tell.
 
+## Scenes: settings and other tools together
+
+A scene is a profile that can also drive other tools through their own agent interfaces. Today that is [Overbright](https://github.com/JJ22007/overbright), the author's brightness tool: a scene can set the built-in display's brightness, and Overbright reads the panel back to prove it arrived.
+
+```bash
+knobs scene                      # list the scenes
+knobs scene present --dry-run    # what would change, brightness included
+knobs scene present              # switch
+knobs undo                       # put everything back, brightness included
+```
+
+`present` keeps the display on, hides desktop icons and widgets, auto-hides the Dock, turns off hot corners and lifts the display to 130% with Overbright. One snapshot covers all of it, so one `knobs undo` restores the settings and the brightness. Without Overbright the brightness step is skipped and reported. Do Not Disturb is not part of it: Focus has no setting Knobs can write and read back.
+
+To add brightness to your own profile, add `"overbright": { "percent": 130 }` (0–100 is the backlight, above 100 the boost). Knobs calls `overbright mcp`; it never writes Overbright's files.
+
 ## Move to a new Mac
 
 On the old Mac:

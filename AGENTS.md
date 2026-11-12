@@ -14,6 +14,8 @@ The command is `~/.local/bin/knobs` (a link into `~/Applications/Knobs.app`). If
 
 Every command that reports something takes `--json`: `list`, `describe`, `get`, `set`, `reset`, `apply`, `undo`, `status`, `verify`.
 
+Scenes: `knobs scene` lists them and `knobs scene <name> [--dry-run] [--json]` switches. A scene is a profile that may also carry `"overbright": {"percent": N}`; Knobs then calls `overbright mcp` and reports Overbright's readback (`reached` or `restored` proves it). The snapshot includes the brightness, so `knobs undo` restores it too. Over MCP, use `apply_profile` with the scene name.
+
 `knobs verify` is read-only: for every key already written on this Mac it checks that macOS stores it in the shape the catalog expects, and lists any mismatch. Keys that were never written cannot be checked this way.
 
 MCP clients can run `knobs mcp`, a stdio MCP server with the same catalog and the same checked writes. It is read-only unless started as `knobs mcp --allow-write`; a dry run always works. Tools: `list_settings`, `describe_setting`, `get_status`, `verify_catalog`, `list_snapshots`, `set_settings`, `reset_settings`, `apply_profile`, `undo`.
