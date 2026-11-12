@@ -14,7 +14,7 @@ struct MCPServer {
 
     private var instructions: String {
         """
-        Knobs changes macOS settings safely. Call list_settings first: every setting has an id, a plain description, \
+        Knobs changes macOS settings safely. Use list_settings (or describe_setting when you already know the id) to find a setting: every setting has an id, a plain description, \
         accepted values, the macOS default and when a change takes effect (instant, newWindows = apps opened from now on, \
         relogin = after logging out and back in). Tell the user about anything that is not instant. \
         Writes save a snapshot first and return the value read back from macOS (verified); undo steps back one change. \
