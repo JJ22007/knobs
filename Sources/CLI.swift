@@ -25,7 +25,7 @@ enum CLI {
       knobs apply <file|https-url|preset> [--dry-run] [--json]
                                                    apply a profile; --dry-run only lists the changes
       knobs presets                                ready-made profiles you can apply by name
-      knobs scene [<name>] [--dry-run] [--json]    list scenes, or switch to one (settings plus Overbright brightness)
+      knobs scene [<name>] [--dry-run] [--json]    list scenes, or switch to one (settings, Overbright brightness, Paneful windows)
       knobs undo [--list] [--json]                 undo the last change (set, reset, apply or the window)
       knobs status [--json]                        is the app running, and are the live features active
       knobs verify [--json]                        check every written key on this Mac against the catalog (read-only)
@@ -54,7 +54,7 @@ enum CLI {
       knobs apply <文件|https 链接|预设名> [--dry-run] [--json]
                                                    应用配置文件;--dry-run 只列出会改什么
       knobs presets                                列出可以直接按名字应用的现成配置
-      knobs scene [<名称>] [--dry-run] [--json]     列出场景,或切换到某个场景(设置加上 Overbright 亮度)
+      knobs scene [<名称>] [--dry-run] [--json]     列出场景,或切换到某个场景(设置、Overbright 亮度、Paneful 窗口)
       knobs undo [--list] [--json]                 撤销上一次修改(set、reset、apply 或窗口里的改动)
       knobs status [--json]                        应用是否在运行,实时功能是否生效
       knobs verify [--json]                        在这台 Mac 上核对每个已写入的键是否符合目录(只读)
@@ -351,14 +351,14 @@ enum CLI {
         }
         if json {
             do {
-                let report = try Profile.apply(text: text, dryRun: dryRun, reason: "knobs apply \(path)")
+                let report = try Profile.apply(text: text, dryRun: dryRun, reason: "knobs apply \(tildePath(path))")
                 if !dryRun { notifyApp() }
                 print(jsonText(report.json(dryRun: dryRun)))
                 return report.problems.isEmpty ? 0 : 1
             } catch { return failJSON("\(error)") }
         }
         do {
-            let report = try Profile.apply(text: text, dryRun: dryRun, reason: "knobs apply \(path)")
+            let report = try Profile.apply(text: text, dryRun: dryRun, reason: "knobs apply \(tildePath(path))")
             report.changed.forEach { print(L("\(dryRun ? "would change" : "changed") \($0)", "\(dryRun ? "将会更改" : "已更改") \($0)")) }
             print(L("\(report.changed.count) \(dryRun ? "to change" : "changed"), \(report.unchanged) already matched.", "\(dryRun ? "将更改" : "已更改") \(report.changed.count) 项,\(report.unchanged) 项本来就一致。"))
             report.problems.forEach { _ = fail($0) }
@@ -461,8 +461,8 @@ enum CLI {
             let about = (obj[prefersChinese ? "about.zh" : "about"] as? String) ?? (obj["about"] as? String) ?? ""
             print("\(name.padding(toLength: 12, withPad: " ", startingAt: 0)) \(about)")
         }
-        print(L("\nPreview with `knobs scene <name> --dry-run`, switch with `knobs scene <name>`, and go back with `knobs undo`.\(Overbright.installed ? "" : " Overbright is not installed, so brightness is skipped.")",
-                "\n用 `knobs scene <名称> --dry-run` 预览,`knobs scene <名称>` 切换,`knobs undo` 还原。\(Overbright.installed ? "" : "没有安装 Overbright,亮度部分会跳过。")"))
+        print(L("\nPreview with `knobs scene <name> --dry-run`, switch with `knobs scene <name>`, and go back with `knobs undo`.\(Overbright.installed ? "" : " Overbright is not installed, so brightness is skipped.")\(Paneful.installed ? "" : " Paneful is not installed, so window layouts are skipped.")",
+                "\n用 `knobs scene <名称> --dry-run` 预览,`knobs scene <名称>` 切换,`knobs undo` 还原。\(Overbright.installed ? "" : "没有安装 Overbright,亮度部分会跳过。")\(Paneful.installed ? "" : "没有安装 Paneful,窗口布局会跳过。")"))
         return 0
     }
 

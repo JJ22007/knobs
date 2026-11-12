@@ -269,7 +269,8 @@ enum Profile {
         let stamp = f.string(from: Date()).replacingOccurrences(of: ":", with: "-")
         let path = backupDirectory + "/\(stamp).knobs.json"
         guard let data = try? JSONSerialization.data(withJSONObject: snapshot(reason: reason, extra: extra), options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
-              fm.createFile(atPath: path, contents: data) else { return nil }
+              // Owner-only: a snapshot can hold window titles from the saved Paneful layout.
+              fm.createFile(atPath: path, contents: data, attributes: [.posixPermissions: 0o600]) else { return nil }
         for old in backups().dropFirst(snapshotLimit) { try? fm.removeItem(atPath: old) }
         return path
     }
@@ -322,9 +323,14 @@ enum Profile {
         var report = Report()
         // A scene can also set Overbright's brightness; the snapshot then remembers where it was.
         let brightness = (obj["overbright"] as? [String: Any])?["percent"] as? NSNumber
+        // And arrange windows with Paneful ("layout"); a snapshot carries the saved layout ("restore").
+        let paneful = obj["paneful"] as? [String: Any]
+        let layout = paneful?["layout"] as? [[String: Any]]
+        let restoreLayout = paneful?["restore"] as? [[String: Any]]
         if !dryRun, snapshot, let preview = try? apply(text: text, dryRun: true), !preview.changed.isEmpty {
             var extra: [String: Any] = [:]
             if brightness != nil, let now = Overbright.currentPercent() { extra["overbright"] = ["percent": now] }
+            if let layout, Paneful.problems(layout).isEmpty, let saved = Paneful.saveLayout() { extra["paneful"] = ["restore": saved] }
             report.snapshot = saveSnapshot(reason: reason, extra: extra)
         }
         var restart = Set<String>()
@@ -410,6 +416,28 @@ enum Profile {
                 report.changed.append("overbright: \((entry["before"] as? Double).map { "\(Int($0))%" } ?? "?") → \(Int(wanted))%  (\(entry["readback"] ?? "no answer"))")
                 report.details.append(entry)
                 if !ok { report.problems.append("overbright: \(entry["error"] ?? "")") }
+            }
+        }
+
+        if let windows = layout ?? restoreLayout {
+            let restoring = layout == nil
+            let bad = restoring ? [] : Paneful.problems(windows)
+            if !bad.isEmpty {
+                report.problems += bad.map { "paneful: " + $0 + L(" (window layout skipped)", "(已跳过窗口布局)") }
+            } else if !Paneful.installed {
+                report.problems.append(L("paneful: not installed, window layout skipped (https://github.com/JJ22007/paneful)", "paneful:没有安装,已跳过窗口布局(https://github.com/JJ22007/paneful)"))
+            } else if dryRun {
+                report.changed.append(restoring ? L("paneful: put \(windows.count) window(s) back", "paneful:把 \(windows.count) 个窗口放回原处")
+                                                : L("paneful: arrange \(windows.count) window(s)", "paneful:摆放 \(windows.count) 个窗口"))
+                report.details.append(["kind": "paneful", "id": "paneful.layout", "before": "current layout",
+                                       "after": restoring ? "saved layout" : "\(windows.count) window(s)"])
+            } else {
+                // The Dock just restarted (auto-hide changes the usable screen area); let it settle first.
+                if !restart.isEmpty { Thread.sleep(forTimeInterval: 1.5) }
+                let (entry, ok) = restoring ? Paneful.restore(windows) : Paneful.apply(windows)
+                report.changed.append(Paneful.line(entry))
+                report.details.append(entry)
+                if !ok { report.problems.append("paneful: \(entry["error"] ?? "")") }
             }
         }
         return report

@@ -1,0 +1,29 @@
+{
+  "knobs": 1,
+  "about": "Like the present scene, and Paneful makes the Keynote window fill the screen. Change \"app\" to the app you present from. `knobs undo` puts the windows back too.",
+  "about.zh": "和 present 场景一样,另外由 Paneful 让 Keynote 窗口铺满屏幕。把 \"app\" 换成你用来演示的应用。`knobs undo` 也会把窗口放回原处。",
+  "settings": {
+    "awake.display": true,
+    "desktop.icons": false,
+    "desktop.widgets": false,
+    "dock.autohide": true,
+    "corners.topLeft": "1",
+    "corners.topRight": "1",
+    "corners.bottomLeft": "1",
+    "corners.bottomRight": "1"
+  },
+  "overbright": {
+    "percent": 130
+  },
+  "paneful": {
+    "layout": [
+      {
+        "app": "Keynote",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      }
+    ]
+  }
+}

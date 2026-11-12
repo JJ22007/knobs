@@ -66,6 +66,9 @@ func selfTest() -> Int32 {
     expect("changes: a refused value is reported", !mixed.ok && mixed.errors.count == 1, "\(mixed.errors)")
     let unknown = Changes.run([.init(id: "no.such", value: .string("on"))], dryRun: true, reason: "test")
     expect("changes: an unknown id is refused", !unknown.ok)
+    expect("paneful: a layout entry needs an app or a title", !Paneful.problems([["x": 0, "y": 0, "w": 1, "h": 1]]).isEmpty)
+    expect("paneful: positions are fractions of the screen", !Paneful.problems([["app": "Keynote", "x": 0, "y": 0, "w": 2, "h": 1]]).isEmpty)
+    expect("paneful: a good layout passes", Paneful.problems([["app": "Keynote", "x": 0, "y": 0, "w": 1, "h": 1]]).isEmpty)
 
     print(fails == 0 ? "all checks passed" : "\(fails) check(s) failed")
     return fails == 0 ? 0 : 1

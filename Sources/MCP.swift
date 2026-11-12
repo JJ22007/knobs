@@ -66,7 +66,7 @@ struct MCPServer {
              schema: object(["ids": ["type": "array", "items": ["type": "string"]], "dryRun": dryRunProperty], required: ["ids"]),
              writes: true),
         Tool(name: "apply_profile",
-             description: "Apply a Knobs profile or scene: a file path, an https link, a bundled preset (snappy, developer, focus, presenter) or a scene (present: settings plus Overbright brightness, if Overbright is installed). Run with dryRun first and show the user the list. Saves one snapshot covering everything it touches, so undo puts it all back, brightness included.",
+             description: "Apply a Knobs profile or scene: a file path, an https link, a bundled preset (snappy, developer, focus, presenter) or a scene (present: settings plus Overbright brightness, if installed; a profile may also carry a Paneful window layout). Run with dryRun first and show the user the list. Saves one snapshot covering everything it touches, so undo puts it all back, brightness and windows included.",
              schema: object(["profile": ["type": "string"], "dryRun": dryRunProperty], required: ["profile"]),
              writes: true),
         Tool(name: "undo", description: "Undo the most recent change made with Knobs (from an agent, the command line or the window). Call again to step further back.",
@@ -127,7 +127,7 @@ struct MCPServer {
             case .failure(let e): return (["ok": false, "errors": [e.description]], true)
             case .success(let text):
                 do {
-                    let report = try Profile.apply(text: text, dryRun: dryRun, reason: "agent apply \(source)")
+                    let report = try Profile.apply(text: text, dryRun: dryRun, reason: "agent apply \(tildePath(source))")
                     if !dryRun { CLI.notifyApp() }
                     return (report.json(dryRun: dryRun), !report.problems.isEmpty)
                 } catch { return (["ok": false, "errors": ["\(error)"]], true) }
