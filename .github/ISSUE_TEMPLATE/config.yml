@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security problem
+    url: https://github.com/JJ22007/knobs/blob/main/SECURITY.md
+    about: Please don't post vulnerability details in public. Read how to report them first.
