@@ -28,6 +28,8 @@ The only thing you cannot do for the user is grant the Accessibility permission,
 
 ## Changing Knobs
 
+You are the owner and long-term maintainer of this codebase, and its design is up to you.
+
 - Swift, compiled with `swiftc` directly, plus one vendored C library in `Vendor/ISS`. No Xcode project, no Swift Package, no other dependencies. Keep it that way.
 - The command line toolchain has no SwiftUI macro plugin: `@State` does not compile. Keep view state in `Model` (`@Published`) as `UI.swift` does.
 - Icons are [Lucide](https://github.com/lucide-icons/lucide) SVGs in `Resources/icons`, drawn as single-colour template images by `lucide(name, size)`. To use a new one, add its SVG there; do not introduce multi-colour icons or SF Symbols.
