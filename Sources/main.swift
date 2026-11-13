@@ -69,6 +69,9 @@ func selfTest() -> Int32 {
     expect("paneful: a layout entry needs an app or a title", !Paneful.problems([["x": 0, "y": 0, "w": 1, "h": 1]]).isEmpty)
     expect("paneful: positions are fractions of the screen", !Paneful.problems([["app": "Keynote", "x": 0, "y": 0, "w": 2, "h": 1]]).isEmpty)
     expect("verify: a stored path is shown with ~", (Verify.shownForTest(.string(NSHomeDirectory() + "/Pictures")) as? String) == "~/Pictures")
+    expect("scenes: present is listed with a title", Scenes.all().contains { $0.name == "present" && !$0.title.isEmpty && $0.title != "present" })
+    expect("scenes: on only right after switching to it", Scenes.matches("present", newestReason: "scene present") && Scenes.matches("present", newestReason: "knobs apply present")
+           && !Scenes.matches("present", newestReason: "knobs set dock.autohide on") && !Scenes.matches("present", newestReason: "knobs apply presenter"))
     expect("paneful: a good layout passes", Paneful.problems([["app": "Keynote", "x": 0, "y": 0, "w": 1, "h": 1]]).isEmpty)
 
     print(fails == 0 ? "all checks passed" : "\(fails) check(s) failed")

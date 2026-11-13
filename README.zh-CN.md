@@ -136,6 +136,8 @@ knobs undo                       # 全部还原,亮度也会还原
 
 `present`(演示模式)会让屏幕不熄灭、隐藏桌面图标和小组件、自动隐藏程序坞、关掉触发角,并用 Overbright 把屏幕提亮到 130%。整个切换只存一份快照,所以一次 `knobs undo` 就能把设置和亮度一起还原。没装 Overbright 时会跳过亮度并在结果里说明。[`examples/present-keynote.knobs.json`](examples/present-keynote.knobs.json) 多了窗口布局:由 Paneful 让 Keynote 窗口铺满屏幕,同一次 `knobs undo` 会把所有窗口放回原处。勿扰模式不在其中:专注模式没有 Knobs 能写入并回读确认的设置。
 
+菜单栏里也有场景:点一下**演示模式**切换,再点一下(这时显示为带勾的**退出演示模式**)就撤销这次切换。只有这次切换是最近一次修改时才算"已开启",所以退出时不会误撤销别的修改。
+
 想在自己的配置里加上亮度,写 `"overbright": { "percent": 130 }`(0–100 是背光,100 以上是增亮)。Knobs 调用的是 `overbright mcp`,不会去改 Overbright 的文件。想摆放窗口,写 `"paneful": { "layout": [{ "app": "Keynote", "x": 0, "y": 0, "w": 1, "h": 1 }] }`(位置是从左上角算起的屏幕比例;每个窗口要写 `app` 或 `title` 来挑窗口,`display` 选屏幕)。Knobs 调用 `paneful mcp`,报告每个窗口的回读结果;存下的窗口布局只留在这台 Mac 的快照里。
 
 ## 换新电脑

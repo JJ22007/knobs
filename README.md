@@ -142,6 +142,8 @@ knobs undo                       # put everything back, brightness included
 
 `present` keeps the display on, hides desktop icons and widgets, auto-hides the Dock, turns off hot corners, and lifts the display to 130% with Overbright. One snapshot covers all of it, so one `knobs undo` restores the settings and the brightness. Without Overbright the brightness step is skipped and reported. [`examples/present-keynote.knobs.json`](examples/present-keynote.knobs.json) adds a window layout: Paneful makes the Keynote window fill the screen, and the same `knobs undo` puts every window back. Do Not Disturb is not part of it: Focus has no setting Knobs can write and read back.
 
+The scenes are also in the menu bar: click **Presenting** to switch, and click it again (**Leave Presenting**, with a check mark) to undo the switch. It counts as on while the switch is the last change, so leaving never undoes something else.
+
 To add brightness to your own profile, add `"overbright": { "percent": 130 }` (0–100 is the backlight, above 100 the boost). Knobs calls `overbright mcp`; it never writes Overbright's files. To arrange windows, add `"paneful": { "layout": [{ "app": "Keynote", "x": 0, "y": 0, "w": 1, "h": 1 }] }` (screen fractions from the top left; each window needs `app` or `title` to pick it, and `display` picks the screen). Knobs calls `paneful mcp` and reports each window's readback; the saved layout stays in the snapshot on this Mac only.
 
 ## Move to a new Mac

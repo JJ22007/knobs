@@ -1,5 +1,7 @@
 {
   "knobs": 1,
+  "title": "Presenting",
+  "title.zh": "演示模式",
   "about": "Presenting: the display stays on, the desktop and Dock are out of the way, nothing pops up in a corner, and Overbright lifts the built-in display to 130%. `knobs undo` puts all of it back. Do Not Disturb is not included: Focus has no setting Knobs can write and read back. To place your slides window too, see examples/present-keynote.knobs.json.",
   "about.zh": "演示模式:屏幕不熄灭,桌面和程序坞让开,角落不会突然弹出东西,Overbright 把内建屏幕提亮到 130%。`knobs undo` 全部还原。不包含勿扰模式:专注模式没有 Knobs 能写入并回读确认的设置。想把幻灯片窗口也摆好,参考 examples/present-keynote.knobs.json。",
   "settings": {
