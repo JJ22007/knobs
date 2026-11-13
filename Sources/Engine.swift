@@ -297,6 +297,9 @@ enum Profile {
         var changed: [String] = []
         var unchanged = 0
         var problems: [String] = []
+        /// Steps left out because a companion tool is not installed. Reported, but not an error:
+        /// the profile is fine, and the rest of it was applied.
+        var skipped: [String] = []
         /// The same changes, structured for --json and MCP: kind, id, before, after.
         var details: [[String: Any]] = []
         var snapshot: String?
@@ -307,7 +310,7 @@ enum Profile {
 
         func json(dryRun: Bool) -> [String: Any] {
             ["ok": problems.isEmpty, "dryRun": dryRun, "changes": details, "unchanged": unchanged,
-             "errors": problems, "snapshot": snapshot.map(tildePath) ?? NSNull()]
+             "errors": problems, "skipped": skipped, "snapshot": snapshot.map(tildePath) ?? NSNull()]
         }
     }
 
@@ -404,7 +407,7 @@ enum Profile {
 
         if let wanted = brightness?.doubleValue {
             if !Overbright.installed {
-                report.problems.append(L("overbright: not installed, brightness skipped (https://github.com/JJ22007/overbright)", "overbright:没有安装,已跳过亮度(https://github.com/JJ22007/overbright)"))
+                report.skipped.append(L("overbright: brightness (Overbright is not installed: https://github.com/JJ22007/overbright)", "overbright:亮度(没有安装 Overbright:https://github.com/JJ22007/overbright)"))
             } else if let now = Overbright.currentPercent(), abs(now - wanted) < 0.5 {
                 report.unchanged += 1
             } else if dryRun {
@@ -425,7 +428,7 @@ enum Profile {
             if !bad.isEmpty {
                 report.problems += bad.map { "paneful: " + $0 + L(" (window layout skipped)", "(已跳过窗口布局)") }
             } else if !Paneful.installed {
-                report.problems.append(L("paneful: not installed, window layout skipped (https://github.com/JJ22007/paneful)", "paneful:没有安装,已跳过窗口布局(https://github.com/JJ22007/paneful)"))
+                report.skipped.append(L("paneful: window layout (Paneful is not installed: https://github.com/JJ22007/paneful)", "paneful:窗口布局(没有安装 Paneful:https://github.com/JJ22007/paneful)"))
             } else if dryRun {
                 report.changed.append(restoring ? L("paneful: put \(windows.count) window(s) back", "paneful:把 \(windows.count) 个窗口放回原处")
                                                 : L("paneful: arrange \(windows.count) window(s)", "paneful:摆放 \(windows.count) 个窗口"))

@@ -153,7 +153,7 @@ final class Model: ObservableObject {
             }
             let alert = NSAlert()
             alert.messageText = L("Apply \(preview.changed.count) changes?", "应用 \(preview.changed.count) 项更改?")
-            alert.informativeText = (preview.changed.prefix(25) + (preview.changed.count > 25 ? ["…"] : []) + preview.problems).joined(separator: "\n")
+            alert.informativeText = (preview.changed.prefix(25) + (preview.changed.count > 25 ? ["…"] : []) + preview.skipped + preview.problems).joined(separator: "\n")
             alert.addButton(withTitle: L("Apply", "应用"))
             alert.addButton(withTitle: L("Cancel", "取消"))
             guard alert.runModal() == .alertFirstButtonReturn else { return }
@@ -161,7 +161,7 @@ final class Model: ObservableObject {
             AppDelegate.shared.reload(askForPermission: true)
             refresh()
             show(L("Applied \(done.changed.count) changes. A snapshot was saved first, so Undo puts them all back.", "已应用 \(done.changed.count) 项更改。应用前已自动存了快照,点“撤销”即可全部恢复。")
-                 + (done.problems.isEmpty ? "" : " " + done.problems.joined(separator: "; ")), error: !done.problems.isEmpty, canUndo: true)
+                 + ((done.skipped + done.problems).isEmpty ? "" : " " + (done.skipped + done.problems).joined(separator: "; ")), error: !done.problems.isEmpty, canUndo: true)
         } catch { show("\(error)", error: true) }
     }
 

@@ -361,6 +361,7 @@ enum CLI {
             let report = try Profile.apply(text: text, dryRun: dryRun, reason: "knobs apply \(tildePath(path))")
             report.changed.forEach { print(L("\(dryRun ? "would change" : "changed") \($0)", "\(dryRun ? "将会更改" : "已更改") \($0)")) }
             print(L("\(report.changed.count) \(dryRun ? "to change" : "changed"), \(report.unchanged) already matched.", "\(dryRun ? "将更改" : "已更改") \(report.changed.count) 项,\(report.unchanged) 项本来就一致。"))
+            report.skipped.forEach { print(L("skipped \($0)", "已跳过 \($0)")) }
             report.problems.forEach { _ = fail($0) }
             if !dryRun { notifyApp() }
             if !dryRun, !report.changed.isEmpty { print(L("Changed your mind? `knobs undo` puts everything back.", "后悔了?运行 `knobs undo` 即可全部恢复。")) }
