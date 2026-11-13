@@ -213,3 +213,31 @@ enum Paneful {
         return "paneful: \(placed) " + L("window(s) placed", "个窗口已摆放") + (skipped > 0 ? L(", \(skipped) skipped", ",跳过 \(skipped) 个") : "") + "  (\(state))"
     }
 }
+
+/// Bundled scenes as the menu shows them.
+enum Scenes {
+    struct Scene { let name: String; let title: String; let about: String }
+
+    static func all() -> [Scene] {
+        CLI.sceneNames().compactMap { name -> Scene? in
+            guard case .success(let text) = CLI.loadProfile(name),
+                  let obj = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any] else { return nil }
+            func field(_ key: String) -> String? { (obj[prefersChinese ? key + ".zh" : key] as? String) ?? (obj[key] as? String) }
+            return Scene(name: name, title: field("title") ?? name, about: field("about") ?? "")
+        }
+    }
+
+    /// What the snapshot taken before switching from the menu says, so the menu can recognise it.
+    static func reason(_ name: String) -> String { "scene \(name)" }
+
+    /// A scene counts as on while the newest snapshot is the one taken before switching to it,
+    /// from the menu, `knobs scene` or an agent. Then undo is exactly "leave the scene".
+    static func isActive(_ name: String) -> Bool {
+        guard let newest = Profile.backups().first else { return false }
+        return matches(name, newestReason: Profile.reason(ofSnapshot: newest))
+    }
+
+    static func matches(_ name: String, newestReason r: String) -> Bool {
+        [reason(name), "knobs apply \(name)", "agent apply \(name)"].contains(r)
+    }
+}

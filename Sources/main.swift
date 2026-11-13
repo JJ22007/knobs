@@ -73,6 +73,10 @@ func selfTest() -> Int32 {
     expect("cli: diff of a missing profile exits 2", CLI.run(["diff", "/nonexistent/x.knobs.json"]) == 2)
     expect("paneful: a good layout passes", Paneful.problems([["app": "Keynote", "x": 0, "y": 0, "w": 1, "h": 1]]).isEmpty)
 
+    expect("scenes: present is listed with a title", Scenes.all().contains { $0.name == "present" && !$0.title.isEmpty && $0.title != "present" })
+    expect("scenes: on only right after switching to it", Scenes.matches("present", newestReason: "scene present") && Scenes.matches("present", newestReason: "knobs apply present")
+           && !Scenes.matches("present", newestReason: "knobs set dock.autohide on") && !Scenes.matches("present", newestReason: "knobs apply presenter"))
+
     print(fails == 0 ? "all checks passed" : "\(fails) check(s) failed")
     return fails == 0 ? 0 : 1
 }
