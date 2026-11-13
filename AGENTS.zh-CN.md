@@ -10,7 +10,7 @@
 2. 用 `title` 和 `description` 向用户说明你打算改什么。只改用户提到的内容。
 3. `knobs set <id> <值> [<id> <值> ...] --json`。加 `--dry-run` 先预览。一批修改要么全做要么全不做:有一个值被拒绝,就什么都不写。每一项都会返回 `before`、`after` 和 `verified`(从 macOS 回读确认);被拒绝时 `ok` 为 false,原因在 `errors`。没检查过就不要说成功。
 4. `takesEffect` 不是"立即生效"时要告诉用户(重新打开 App,或注销重新登录)。
-5. 每次修改(set、reset、apply,或在窗口里点一下)之前都会先存快照。`knobs undo` 一次撤回一步;`knobs undo --list` 列出每个快照是在什么修改之前存的。`knobs reset <id>` 把单项交还给 macOS。
+5. 每次修改(set、reset、apply,或在窗口里点一下)之前都会先存快照。`knobs undo` 一次撤回一步;`knobs undo --dry-run` 只列出会恢复什么,不做任何修改;`knobs undo --list` 列出每个快照是在什么修改之前存的。`knobs reset <id>` 把单项交还给 macOS。
 
 所有会输出结果的命令都支持 `--json`:`list`、`describe`、`get`、`set`、`reset`、`apply`、`undo`、`status`、`verify`。
 
@@ -22,7 +22,7 @@
 
 输出语言跟随系统。需要固定语言时加环境变量:`KNOBS_LANG=en` 或 `KNOBS_LANG=zh`。设置的值始终用英文书写(`on`、`off`、数字、选项名)。
 
-按配置文件配置一台 Mac:先 `knobs apply <文件|https 链接|预设名> --dry-run`,把清单给用户看,再去掉 `--dry-run` 应用。`knobs undo` 撤销上一次应用(应用前会自动存快照)。`knobs presets` 列出自带预设;新预设放进 `presets/`,`build.sh` 会校验。
+按配置文件配置一台 Mac:先 `knobs apply <文件|https 链接|预设名> --dry-run`,把清单给用户看,再去掉 `--dry-run` 应用。`knobs undo` 撤销上一次应用(应用前会自动存快照)。`knobs diff <配置>` 只比较不写入:退出码 0 表示已经一致,1 表示有不一致,2 表示配置文件读不了或有无效内容。`knobs presets` 列出自带预设;新预设放进 `presets/`,`build.sh` 会校验。
 
 唯一不能替用户做的事,是授予"辅助功能"权限(无动画切换桌面需要它)。如果 `knobs set spaces.instant on` 提示正在等待权限,请用户到 系统设置 → 隐私与安全性 → 辅助功能 打开 Knobs。Knobs 一秒内就会发现,用 `knobs status` 确认。不要尝试自己授权,这个项目里的任何操作都不要用 `sudo`。
 
