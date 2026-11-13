@@ -68,6 +68,7 @@ func selfTest() -> Int32 {
     expect("changes: an unknown id is refused", !unknown.ok)
     expect("paneful: a layout entry needs an app or a title", !Paneful.problems([["x": 0, "y": 0, "w": 1, "h": 1]]).isEmpty)
     expect("paneful: positions are fractions of the screen", !Paneful.problems([["app": "Keynote", "x": 0, "y": 0, "w": 2, "h": 1]]).isEmpty)
+    expect("verify: a stored path is shown with ~", (Verify.shownForTest(.string(NSHomeDirectory() + "/Pictures")) as? String) == "~/Pictures")
     expect("paneful: a good layout passes", Paneful.problems([["app": "Keynote", "x": 0, "y": 0, "w": 1, "h": 1]]).isEmpty)
 
     print(fails == 0 ? "all checks passed" : "\(fails) check(s) failed")

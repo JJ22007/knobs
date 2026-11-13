@@ -197,11 +197,11 @@ enum Verify {
                     row["result"] = "unset"
                 } else if let problem = problem(s, raw!, prefs) {
                     row["result"] = "mismatch"
-                    row["stored"] = raw!.any
+                    row["stored"] = shown(raw!)
                     row["problem"] = problem
                 } else {
                     row["result"] = "ok"
-                    row["stored"] = raw!.any
+                    row["stored"] = shown(raw!)
                 }
             }
             let result = row["result"] as! String
@@ -211,6 +211,14 @@ enum Verify {
         return ["macOS": ProcessInfo.processInfo.operatingSystemVersionString, "counts": counts,
                 "ok": counts["mismatch"] == 0, "settings": rows]
     }
+
+    /// Stored values as reported: a path keeps ~ instead of the home folder (the screenshot folder, for example).
+    private static func shown(_ v: Value) -> Any {
+        if let text = v.asString, text.hasPrefix(NSHomeDirectory()) { return tildePath(text) }
+        return v.any
+    }
+
+    static func shownForTest(_ v: Value) -> Any { shown(v) }
 
     private static func problem(_ s: Setting, _ raw: Value, _ prefs: [Pref]) -> String? {
         switch s.kind {
