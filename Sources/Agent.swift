@@ -148,10 +148,11 @@ enum Changes {
         var from: String?
         var reason = ""
         var error: String?
+        var dryRun = false
 
         var json: [String: Any] {
             if let error { return ["ok": false, "errors": [error]] }
-            var obj = report.json(dryRun: false)
+            var obj = report.json(dryRun: dryRun)
             obj["restoredFrom"] = from.map(tildePath) ?? NSNull()
             obj["undid"] = reason
             obj["remaining"] = Profile.backups().count
@@ -160,8 +161,10 @@ enum Changes {
     }
 
     /// Puts back the newest snapshot and removes it, so the next undo goes one step further back.
-    static func undo() -> UndoResult {
+    /// With `dryRun`, reports what the newest snapshot would put back and leaves it in place.
+    static func undo(dryRun: Bool = false) -> UndoResult {
         var result = UndoResult()
+        result.dryRun = dryRun
         guard let latest = Profile.backups().first, let text = try? String(contentsOfFile: latest, encoding: .utf8) else {
             result.error = L("nothing to undo: no change has been made with Knobs yet", "没有可撤销的:还没有用 Knobs 改过设置")
             return result
@@ -169,7 +172,8 @@ enum Changes {
         result.from = latest
         result.reason = Profile.reason(ofSnapshot: latest)
         do {
-            result.report = try Profile.apply(text: text, dryRun: false, snapshot: false)
+            result.report = try Profile.apply(text: text, dryRun: dryRun, snapshot: false)
+            if dryRun { return result }
             try? FileManager.default.removeItem(atPath: latest)
             CLI.notifyApp()
         } catch { result.error = "\(error)" }

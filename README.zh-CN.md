@@ -102,7 +102,8 @@ knobs set dock.autohide on dock.autohideDelay 0
 knobs reset dock.autohideDelay # 交还给 macOS 默认值
 knobs set spaces.instant on    # 会报告是否真的生效,没生效会说明原因
 knobs set dock.size 48 --dry-run --json   # 预览;--json 会给出修改前后的值、是否回读确认、何时生效
-knobs undo                     # 撤回一步;knobs undo --list 查看历史
+knobs undo                     # 撤回一步;--dry-run 先预览,--list 查看历史
+knobs diff snappy              # 比较配置文件和这台 Mac,不写入(退出码 0 一致,1 不一致)
 knobs verify                   # 只读:这台 Mac 上已写入的键是否符合目录
 knobs status
 ```

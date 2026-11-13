@@ -69,8 +69,8 @@ struct MCPServer {
              description: "Apply a Knobs profile or scene: a file path, an https link, a bundled preset (snappy, developer, focus, presenter) or a scene (present: settings plus Overbright brightness, if installed; a profile may also carry a Paneful window layout). Run with dryRun first and show the user the list. Saves one snapshot covering everything it touches, so undo puts it all back, brightness and windows included.",
              schema: object(["profile": ["type": "string"], "dryRun": dryRunProperty], required: ["profile"]),
              writes: true),
-        Tool(name: "undo", description: "Undo the most recent change made with Knobs (from an agent, the command line or the window). Call again to step further back.",
-             schema: object([:]), writes: true),
+        Tool(name: "undo", description: "Undo the most recent change made with Knobs (from an agent, the command line or the window). Call again to step further back. With dryRun, list what it would put back and change nothing.",
+             schema: object(["dryRun": dryRunProperty]), writes: true),
     ]
 
     private func toolList() -> [[String: Any]] {
@@ -133,7 +133,7 @@ struct MCPServer {
                 } catch { return (["ok": false, "errors": ["\(error)"]], true) }
             }
         case "undo":
-            let r = Changes.undo()
+            let r = Changes.undo(dryRun: dryRun)
             return (r.json, r.error != nil || !r.report.problems.isEmpty)
         default:
             return (["ok": false, "errors": ["unknown tool \(name)"]], true)

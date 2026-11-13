@@ -8,7 +8,7 @@
 import AppKit
 
 enum CLI {
-    static let commands: Set<String> = ["list", "get", "describe", "set", "reset", "export", "apply", "shortcut", "status", "open", "skill", "presets", "scene", "undo", "verify", "mcp", "help", "--help", "-h"]
+    static let commands: Set<String> = ["list", "get", "describe", "set", "reset", "export", "apply", "shortcut", "status", "open", "skill", "presets", "scene", "undo", "verify", "diff", "mcp", "help", "--help", "-h"]
 
     private static let usageEN = """
     knobs: read and change macOS settings from scripts and agents.
@@ -20,13 +20,16 @@ enum CLI {
                                                    change settings (on/off, a number, or a choice)
       knobs reset <id> [<id> ...] [--dry-run] [--json]
                                                    hand settings back to the macOS default
-      knobs shortcut [<name> <combo|none>]         show or change the Space shortcuts (e.g. spaceLeft ctrl+left)
+      knobs shortcut [<name> <combo|none>] [--dry-run] [--json]
+                                                   show or change the Space shortcuts (e.g. spaceLeft ctrl+left)
       knobs export [file]                          write all settings and shortcuts as one profile
       knobs apply <file|https-url|preset> [--dry-run] [--json]
                                                    apply a profile; --dry-run only lists the changes
-      knobs presets                                ready-made profiles you can apply by name
+      knobs diff <file|https-url|preset|scene> [--json]
+                                                   compare a profile with this Mac, write nothing (exit 0 same, 1 differs, 2 error)
+      knobs presets [--json]                       ready-made profiles you can apply by name
       knobs scene [<name>] [--dry-run] [--json]    list scenes, or switch to one (settings, Overbright brightness, Paneful windows)
-      knobs undo [--list] [--json]                 undo the last change (set, reset, apply or the window)
+      knobs undo [--list] [--dry-run] [--json]     undo the last change (set, reset, apply or the window)
       knobs status [--json]                        is the app running, and are the live features active
       knobs verify [--json]                        check every written key on this Mac against the catalog (read-only)
       knobs open                                   open the Knobs window
@@ -49,13 +52,16 @@ enum CLI {
                                                    修改设置(on/off、数字或选项)
       knobs reset <id> [<id> ...] [--dry-run] [--json]
                                                    恢复为 macOS 默认
-      knobs shortcut [<名称> <组合键|none>]        查看或修改切换桌面的快捷键(例如 spaceLeft ctrl+left)
+      knobs shortcut [<名称> <组合键|none>] [--dry-run] [--json]
+                                                   查看或修改切换桌面的快捷键(例如 spaceLeft ctrl+left)
       knobs export [文件]                          把所有设置和快捷键导出成一个配置文件
       knobs apply <文件|https 链接|预设名> [--dry-run] [--json]
                                                    应用配置文件;--dry-run 只列出会改什么
-      knobs presets                                列出可以直接按名字应用的现成配置
+      knobs diff <文件|https 链接|预设|场景> [--json]
+                                                   比较配置文件和这台 Mac,不写入(退出码 0 一致,1 不一致,2 出错)
+      knobs presets [--json]                       列出可以直接按名字应用的现成配置
       knobs scene [<名称>] [--dry-run] [--json]     列出场景,或切换到某个场景(设置、Overbright 亮度、Paneful 窗口)
-      knobs undo [--list] [--json]                 撤销上一次修改(set、reset、apply 或窗口里的改动)
+      knobs undo [--list] [--dry-run] [--json]     撤销上一次修改(set、reset、apply 或窗口里的改动)
       knobs status [--json]                        应用是否在运行,实时功能是否生效
       knobs verify [--json]                        在这台 Mac 上核对每个已写入的键是否符合目录(只读)
       knobs open                                   打开 Knobs 窗口
@@ -80,23 +86,28 @@ enum CLI {
         }
         let json = flag("--json")
         let dryRun = flag("--dry-run")
+        // A preview must never write. Commands with nothing to preview refuse the flag rather than run for real.
+        if dryRun, ["open", "skill", "mcp", "export"].contains(args[0]) {
+            return fail(L("`knobs \(args[0])` has no --dry-run", "`knobs \(args[0])` 不支持 --dry-run"))
+        }
         switch args[0] {
         case "list": return list(json: json, changedOnly: flag("--changed"), category: rest.first)
         case "describe": return json ? eachJSON(rest) { record($0, live: liveStates()) } : each(rest) { print(describe($0)) }
         case "get": return json ? eachJSON(rest) { ["id": $0.id, "value": Changes.shownValue($0, Engine.current($0)), "customized": Engine.current($0) != nil] } : each(rest) { print(shown($0)) }
         case "set": return set(rest, dryRun: dryRun, json: json)
         case "reset": return reset(rest, dryRun: dryRun, json: json)
-        case "shortcut": return shortcut(rest)
+        case "shortcut": return shortcut(rest, dryRun: dryRun, json: json)
+        case "diff": return diff(rest.first, json: json)
         case "export": return export(rest.first)
         case "apply": return apply(dryRun: dryRun, path: rest.first, json: json)
         case "status": return status(json: json)
         case "open": return launchApp(background: false) ? 0 : 1
         case "skill": return skill(rest.first ?? "print")
-        case "presets": return presets()
+        case "presets": return presets(json: json)
         case "scene":
-            guard let name = rest.first else { return scenes() }
+            guard let name = rest.first else { return scenes(json: json) }
             return apply(dryRun: dryRun, path: name, json: json)
-        case "undo": return undo(list: flag("--list"), json: json)
+        case "undo": return undo(list: flag("--list"), dryRun: dryRun, json: json)
         case "verify": return verify(json: json)
         case "mcp": return MCPServer(allowWrite: flag("--allow-write")).run()
         default: print(usage); return 0
@@ -123,11 +134,11 @@ enum CLI {
         1. Find the setting: `knobs list --json` (all \(catalog.count)), or `knobs list <category>` for one of: \(Category.allCases.map { $0.rawValue }.joined(separator: ", ")).
         2. Change only what the user asked for: `knobs set <id> <value> [<id> <value> ...] --json`. Values are `on`/`off`, a number, or one of the `options` values. Add `--dry-run` to preview. A batch is all or nothing: if one value is refused, nothing is written. Exit code 1 means something was refused; with `--json` the reasons are in `errors`.
         3. Each change reports `before`, `after`, `verified` (the value read back from macOS) and `takesEffect` (`instant`, `newWindows` = apps opened from now on, `relogin` = after logging out and back in). Tell the user what changed and anything that is not instant.
-        4. Every change saves a snapshot first. `knobs undo` steps back one change (`knobs undo --list` shows the history); `knobs reset <id>` hands one setting back to the macOS default.
+        4. Every change saves a snapshot first. `knobs undo` steps back one change (`--dry-run` previews it, `--list` shows the history); `knobs reset <id>` hands one setting back to the macOS default.
 
         For MCP clients: `knobs mcp` is a read-only MCP server; `knobs mcp --allow-write` also allows changes.
 
-        Whole setup: `knobs export <file>` saves everything (plus the Paneful window manager config); on another Mac, `knobs apply <file> --dry-run` shows the changes and `knobs apply <file>` makes them.
+        Whole setup: `knobs export <file>` saves everything (plus the Paneful window manager config); on another Mac, `knobs diff <file>` shows what differs (exit 0 when it already matches) and `knobs apply <file>` makes the changes.
 
         The one thing you cannot do: grant the Accessibility permission that instant Space switching needs. If `knobs set spaces.instant on` says it is waiting, ask the user to switch Knobs on in System Settings > Privacy & Security > Accessibility, then check with `knobs status`.
 
@@ -312,14 +323,29 @@ enum CLI {
         return out.ok ? 0 : 1
     }
 
-    private static func shortcut(_ args: [String]) -> Int32 {
+    private static func shortcut(_ args: [String], dryRun: Bool, json: Bool) -> Int32 {
+        let fail: (String) -> Int32 = json ? failJSON : CLI.fail
+        var change: [String: Any]?
         if args.count == 2 {
             guard Config.shortcutNames.contains(args[0]) else { return fail(L("unknown shortcut \"\(args[0])\"; names: \(Config.shortcutNames.joined(separator: ", "))", "不认识的快捷键“\(args[0])”;可用名称:\(Config.shortcutNames.joined(separator: ", "))")) }
             let combo = args[1] == "none" ? "" : args[1]
             guard combo.isEmpty || KeyCombo.parse(combo) != nil else { return fail(L("cannot read \"\(combo)\"; write it like ctrl+left or ctrl+alt+1", "无法识别“\(combo)”;请写成 ctrl+left 或 ctrl+alt+1 这样")) }
-            ConfigStore.update { $0.shortcuts[args[0]] = combo }
+            let before = ConfigStore.load().shortcuts[args[0]] ?? ""
+            change = ["id": args[0], "before": before.isEmpty ? "none" : before, "after": combo.isEmpty ? "none" : combo, "changed": before != combo]
+            if !dryRun { ConfigStore.update { $0.shortcuts[args[0]] = combo } }
         } else if !args.isEmpty {
-            return fail(L("usage: knobs shortcut [<name> <combo|none>]", "用法:knobs shortcut [<名称> <组合键|none>]"))
+            return fail(L("usage: knobs shortcut [<name> <combo|none>] [--dry-run] [--json]", "用法:knobs shortcut [<名称> <组合键|none>] [--dry-run] [--json]"))
+        }
+        if json {
+            var obj: [String: Any] = ["shortcuts": Dictionary(uniqueKeysWithValues: Config.shortcutNames.map { n -> (String, String) in
+                let c = ConfigStore.load().shortcuts[n] ?? ""; return (n, c.isEmpty ? "none" : c) })]
+            if let change { obj["change"] = change; obj["dryRun"] = dryRun; obj["ok"] = true }
+            print(jsonText(obj))
+            return 0
+        }
+        if dryRun, let change {
+            print(L("would change shortcut \(change["id"]!): \(change["before"]!) → \(change["after"]!)", "将会更改快捷键 \(change["id"]!):\(change["before"]!) → \(change["after"]!)"))
+            return 0
         }
         let shortcuts = ConfigStore.load().shortcuts
         for name in Config.shortcutNames {
@@ -417,7 +443,40 @@ enum CLI {
                                      "找不到名为“\(source)”的文件、链接或预设。可用预设:\(presetNames().joined(separator: ", "))")))
     }
 
-    private static func undo(list: Bool, json: Bool) -> Int32 {
+    /// Compare a profile with this Mac without writing anything. Exit 0: it already matches;
+    /// 1: something differs; 2: the profile could not be read or has invalid entries. Like diff(1).
+    private static func diff(_ source: String?, json: Bool) -> Int32 {
+        func bad(_ text: String) -> Int32 {
+            if json { print(jsonText(["ok": false, "same": false, "errors": [text]])) } else { FileHandle.standardError.write(Data((L("error: ", "错误: ") + text + "\n").utf8)) }
+            return 2
+        }
+        guard let source else { return bad(L("usage: knobs diff <file|https-url|preset|scene> [--json]", "用法:knobs diff <文件|https 链接|预设|场景> [--json]")) }
+        let text: String
+        switch loadProfile(source) {
+        case .success(let t): text = t
+        case .failure(let e): return bad(e.description)
+        }
+        let report: Profile.Report
+        do { report = try Profile.apply(text: text, dryRun: true) } catch { return bad("\(error)") }
+        let same = report.changed.isEmpty
+        if json {
+            var obj = report.json(dryRun: true)
+            obj["same"] = same && report.problems.isEmpty
+            obj["differences"] = obj.removeValue(forKey: "changes")
+            obj.removeValue(forKey: "snapshot")
+            print(jsonText(obj))
+        } else {
+            report.changed.forEach { print(L("differs  \($0)", "不一致  \($0)")) }
+            report.skipped.forEach { print(L("skipped  \($0)", "已跳过  \($0)")) }
+            report.problems.forEach { FileHandle.standardError.write(Data((L("error: ", "错误: ") + $0 + "\n").utf8)) }
+            print(same ? L("This Mac already matches \(tildePath(source)) (\(report.unchanged) checked).", "这台 Mac 已经和 \(tildePath(source)) 一致(核对了 \(report.unchanged) 项)。")
+                       : L("\(report.changed.count) differ, \(report.unchanged) already match. Nothing was changed.", "\(report.changed.count) 项不一致,\(report.unchanged) 项一致。没有做任何修改。"))
+        }
+        if !report.problems.isEmpty { return 2 }
+        return same ? 0 : 1
+    }
+
+    private static func undo(list: Bool, dryRun: Bool, json: Bool) -> Int32 {
         let all = Profile.backups()
         if list {
             if json {
@@ -430,7 +489,16 @@ enum CLI {
             }
             return 0
         }
-        let result = Changes.undo()
+        let result = Changes.undo(dryRun: dryRun)
+        if dryRun, !json {
+            if let error = result.error { return fail(error) }
+            result.report.changed.forEach { print(L("would restore \($0)", "将会恢复 \($0)")) }
+            result.report.skipped.forEach { print(L("skipped \($0)", "已跳过 \($0)")) }
+            print(L("`knobs undo` would undo \"\(result.reason)\": \(result.report.changed.count) to restore. Nothing was changed.",
+                    "`knobs undo` 会撤销“\(result.reason)”:要恢复 \(result.report.changed.count) 项。这次没有做任何修改。"))
+            result.report.problems.forEach { _ = fail($0) }
+            return result.report.problems.isEmpty ? 0 : 1
+        }
         if json {
             print(jsonText(result.json))
             return result.error == nil && result.report.problems.isEmpty ? 0 : 1
@@ -455,7 +523,24 @@ enum CLI {
         return r["ok"] as? Bool == true ? 0 : 1
     }
 
-    private static func scenes() -> Int32 {
+    /// Name, description and settings count of each bundled profile, for --json.
+    private static func catalogOf(_ names: [String]) -> [[String: Any]] {
+        names.compactMap { name in
+            guard case .success(let text) = loadProfile(name),
+                  let obj = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any] else { return nil }
+            var row: [String: Any] = ["name": name, "settings": (obj["settings"] as? [String: Any])?.count ?? 0,
+                                      "about": obj["about"] ?? "", "about.zh": obj["about.zh"] ?? ""]
+            if let b = (obj["overbright"] as? [String: Any])?["percent"] { row["overbrightPercent"] = b }
+            if let l = (obj["paneful"] as? [String: Any])?["layout"] as? [Any] { row["panefulWindows"] = l.count }
+            return row
+        }
+    }
+
+    private static func scenes(json: Bool) -> Int32 {
+        if json {
+            print(jsonText(["scenes": catalogOf(sceneNames()), "overbrightInstalled": Overbright.installed, "panefulInstalled": Paneful.installed]))
+            return 0
+        }
         for name in sceneNames() {
             guard case .success(let text) = loadProfile(name),
                   let obj = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any] else { continue }
@@ -467,7 +552,8 @@ enum CLI {
         return 0
     }
 
-    private static func presets() -> Int32 {
+    private static func presets(json: Bool) -> Int32 {
+        if json { print(jsonText(["presets": catalogOf(presetNames())])); return 0 }
         for name in presetNames() {
             guard case .success(let text) = loadProfile(name),
                   let obj = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any] else { continue }
